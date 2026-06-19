@@ -7,11 +7,12 @@ dei dipendenti, con **approvazione/rifiuto** da parte dei manager abilitati.
 **sia Android sia iPhone**, senza passare dagli store. Si apre da browser e si
 può aggiungere alla schermata Home come una normale app.
 
-> **Stato attuale: PROTOTIPO funzionante.**
-> I dati sono salvati localmente sul dispositivo (`localStorage`) e ci sono
-> utenti/richieste di esempio. Il livello dati è già predisposto per essere
-> collegato al database centrale **Supabase** (vedi sotto) senza riscrivere
-> l'interfaccia.
+> **Stato attuale: pronta per il database centrale.**
+> L'app è collegata a **Supabase**: appena imposti le chiavi del progetto
+> (vedi sotto), i dati vivono su un archivio centrale e **tutti i telefoni
+> vedono gli stessi dati, aggiornati in tempo reale**. Finché le chiavi non
+> sono configurate, l'app funziona in **modalità demo** con dati locali di
+> esempio (utile per provarla).
 
 **Demo online:** <https://gio557.github.io/greeneco-straordinari/>
 
@@ -63,66 +64,43 @@ componenti non cambiano.
 
 ## Collegare il database centrale (Supabase)
 
-Quando vorrai passare dai dati demo al database vero:
+L'app è **già collegata** a Supabase tramite `src/data/api.js`, che sceglie da
+solo l'archivio da usare:
 
-1. Crea un progetto gratuito su <https://supabase.com>.
-2. Esegui lo **schema SQL** qui sotto (SQL Editor di Supabase).
-3. Copia `.env.example` in `.env` e inserisci `VITE_SUPABASE_URL` e
-   `VITE_SUPABASE_ANON_KEY` (le trovi in *Project Settings → API*).
-4. Riscriviamo `src/data/api.js` usando il client di `supabaseClient.js`
-   (login con email/password tramite **Supabase Auth**).
+- **chiavi configurate** → database centrale condiviso, con aggiornamenti in
+  tempo reale (tutti i telefoni vedono gli stessi dati);
+- **chiavi mancanti** → modalità demo locale (dati di esempio sul dispositivo).
 
-### Schema SQL proposto
+### Passi per attivarlo (una volta sola)
 
-```sql
--- Profili utente (collegati all'autenticazione di Supabase)
-create table profiles (
-  id          uuid primary key references auth.users (id),
-  full_name   text not null,
-  role        text not null check (role in ('employee','manager')),
-  department  text,
-  manager_id  uuid references profiles (id),
-  created_at  timestamptz default now()
-);
+1. **Crea il progetto.** Vai su <https://supabase.com>, accedi e crea un nuovo
+   progetto gratuito (scegli una password per il database e una region vicina,
+   es. *West EU*). Attendi che il progetto sia pronto (~2 minuti).
 
--- Richieste di straordinario
-create table overtime_requests (
-  id            uuid primary key default gen_random_uuid(),
-  employee_id   uuid not null references profiles (id),
-  manager_id    uuid references profiles (id),
-  work_date     date not null,
-  hours         numeric(4,1) not null check (hours > 0),
-  reason        text not null,
-  status        text not null default 'pending'
-                check (status in ('pending','approved','rejected')),
-  decision_note text,
-  decided_by    uuid references profiles (id),
-  created_at    timestamptz default now(),
-  decided_at    timestamptz
-);
+2. **Crea le tabelle.** Nel menu a sinistra apri **SQL Editor → New query**,
+   incolla **tutto** il contenuto di [`supabase/schema.sql`](supabase/schema.sql)
+   e premi **Run**. Crea tabelle, sicurezza, tempo reale e i dati demo iniziali.
 
--- Sicurezza a livello di riga: ognuno vede solo ciò che gli compete
-alter table overtime_requests enable row level security;
+3. **Copia le chiavi.** In **Project Settings → API** trovi:
+   - **Project URL** → `VITE_SUPABASE_URL`
+   - **anon public** key → `VITE_SUPABASE_ANON_KEY`
 
-create policy "Il dipendente vede le proprie richieste"
-  on overtime_requests for select
-  using (employee_id = auth.uid());
+   La chiave *anon* è pensata per stare nel codice del browser: è pubblica e
+   sicura, l'accesso ai dati è regolato dalle policy del database.
 
-create policy "Il manager vede le richieste del team"
-  on overtime_requests for select
-  using (manager_id = auth.uid());
+4. **In locale:** copia `.env.example` in `.env` e incolla le due chiavi, poi
+   `npm run dev`.
 
-create policy "Il dipendente crea le proprie richieste"
-  on overtime_requests for insert
-  with check (employee_id = auth.uid());
+5. **Per il sito pubblico (GitHub Pages):** aggiungi le chiavi come **Secrets**
+   del repository — *Settings → Secrets and variables → Actions → New
+   repository secret* — creando `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+   Al successivo push su `main` il sito userà automaticamente il database.
 
-create policy "Solo il manager decide sulle proprie richieste"
-  on overtime_requests for update
-  using (manager_id = auth.uid());
-```
-
-Supabase offre anche aggiornamenti in **tempo reale**: il manager può vedere le
-nuove richieste comparire senza ricaricare.
+> **Accesso:** in questa fase l'app usa la **scelta del profilo** (senza
+> password) e le policy del database consentono l'accesso tramite la chiave
+> pubblica. Il login con **email e password** (Supabase Auth), con regole di
+> sicurezza più strette, è previsto come passo successivo: lo schema SQL
+> contiene già i suggerimenti in fondo al file.
 
 ## Pubblicazione
 

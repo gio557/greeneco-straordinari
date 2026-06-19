@@ -1,123 +1,33 @@
 // ---------------------------------------------------------------------------
-// Livello dati dell'applicazione.
+// Livello dati dell'applicazione — PUNTO UNICO di accesso ai dati.
 //
-// Tutta l'interfaccia (UI) usa SOLO le funzioni esportate qui sotto. In questo
-// modo, quando colleghiamo il database reale, basta riscrivere l'implementazione
-// di queste funzioni usando Supabase (vedi ./supabaseClient.js e il README),
-// senza toccare i componenti.
+// Tutta l'interfaccia (UI) usa SOLO le funzioni esportate qui sotto. Questo
+// modulo sceglie automaticamente l'implementazione giusta:
 //
-// Prototipo: i dati sono salvati nel localStorage del dispositivo così
-// sopravvivono al riavvio dell'app. Le funzioni sono "async" apposta, per
-// avere la stessa firma delle future chiamate di rete a Supabase.
+//   • se le chiavi di Supabase sono configurate  → database centrale condiviso
+//     (tutti i dispositivi vedono gli stessi dati, aggiornati in tempo reale);
+//   • altrimenti                                  → dati demo locali (per provare
+//     l'app prima di collegare il database).
+//
+// Le chiavi si impostano in un file `.env` (vedi `.env.example`) e, per la
+// pubblicazione su GitHub Pages, come secret del repository (vedi README).
 // ---------------------------------------------------------------------------
 
-import { USERS, REQUESTS } from './seed.js'
+import { supabaseConfigured } from './supabaseClient.js'
+import * as local from './localApi.js'
+import * as remote from './supabaseApi.js'
 
-const STORAGE_KEY = 'straordinari_state_v1'
+const impl = supabaseConfigured ? remote : local
 
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {
-    // localStorage non disponibile o dati corrotti: si riparte dal seed.
-  }
-  const initial = { users: USERS, requests: REQUESTS }
-  save(initial)
-  return initial
-}
+// 'supabase' = database centrale condiviso · 'demo' = dati locali sul telefono.
+export const dataMode = supabaseConfigured ? 'supabase' : 'demo'
 
-function save(state) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  } catch {
-    // In modalità privata la scrittura può fallire: l'app resta usabile
-    // per la sessione corrente.
-  }
-}
-
-// Piccolo ritardo per simulare la latenza di rete e rendere realistico il demo.
-const delay = (ms = 220) => new Promise((r) => setTimeout(r, ms))
-
-export async function listUsers() {
-  await delay(120)
-  return load().users
-}
-
-export async function login(userId) {
-  await delay()
-  const user = load().users.find((u) => u.id === userId)
-  if (!user) throw new Error('Utente non trovato')
-  return user
-}
-
-export async function getRequestsForEmployee(employeeId) {
-  await delay()
-  return load()
-    .requests.filter((r) => r.employeeId === employeeId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-}
-
-export async function getRequestsForManager(managerId) {
-  await delay()
-  return load()
-    .requests.filter((r) => r.managerId === managerId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-}
-
-export async function createRequest({ employeeId, date, hours, reason }) {
-  await delay()
-  const state = load()
-  const employee = state.users.find((u) => u.id === employeeId)
-  if (!employee) throw new Error('Dipendente non trovato')
-
-  const request = {
-    id: `req-${Date.now()}`,
-    employeeId,
-    date,
-    hours: Number(hours),
-    reason: reason.trim(),
-    status: 'pending',
-    managerId: employee.managerId,
-    decisionNote: '',
-    decidedBy: null,
-    createdAt: new Date().toISOString(),
-    decidedAt: null,
-  }
-  state.requests.push(request)
-  save(state)
-  return request
-}
-
-export async function decideRequest({ requestId, decision, note, managerId }) {
-  await delay()
-  if (!['approved', 'rejected'].includes(decision)) {
-    throw new Error('Decisione non valida')
-  }
-  const state = load()
-  const request = state.requests.find((r) => r.id === requestId)
-  if (!request) throw new Error('Richiesta non trovata')
-  if (request.managerId !== managerId) {
-    throw new Error('Non sei autorizzato a gestire questa richiesta')
-  }
-
-  request.status = decision
-  request.decisionNote = (note || '').trim()
-  request.decidedBy = managerId
-  request.decidedAt = new Date().toISOString()
-  save(state)
-  return request
-}
-
-// Utile per nominare dipendenti/manager nelle schermate.
-export async function getUserMap() {
-  await delay(60)
-  const map = {}
-  for (const u of load().users) map[u.id] = u
-  return map
-}
-
-// Solo per il prototipo: riporta i dati demo allo stato iniziale.
-export async function resetDemoData() {
-  save({ users: USERS, requests: REQUESTS })
-}
+export const listUsers = impl.listUsers
+export const login = impl.login
+export const getRequestsForEmployee = impl.getRequestsForEmployee
+export const getRequestsForManager = impl.getRequestsForManager
+export const createRequest = impl.createRequest
+export const decideRequest = impl.decideRequest
+export const getUserMap = impl.getUserMap
+export const resetDemoData = impl.resetDemoData
+export const subscribeToRequests = impl.subscribeToRequests

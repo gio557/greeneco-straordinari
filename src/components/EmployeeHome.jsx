@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getRequestsForEmployee } from '../data/api.js'
+import { getRequestsForEmployee, subscribeToRequests } from '../data/api.js'
 import RequestCard from './RequestCard.jsx'
 import NewRequest from './NewRequest.jsx'
 
@@ -10,14 +10,18 @@ export default function EmployeeHome({ user }) {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
 
-  async function refresh() {
-    setLoading(true)
+  async function refresh(showSpinner = false) {
+    if (showSpinner) setLoading(true)
     setRequests(await getRequestsForEmployee(user.id))
     setLoading(false)
   }
 
   useEffect(() => {
-    refresh()
+    refresh(true)
+    // Aggiornamento in tempo reale: se il manager decide su una richiesta,
+    // la lista si aggiorna da sola senza ricaricare l'app.
+    const unsubscribe = subscribeToRequests(() => refresh(false))
+    return unsubscribe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id])
 

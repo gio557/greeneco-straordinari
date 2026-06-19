@@ -28,7 +28,13 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # Le chiavi Supabase arrivano dai Secrets del repository (Settings →
+      # Secrets and variables → Actions). Se non impostate, l'app viene
+      # compilata in modalità demo locale (nessun errore).
       - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       # enablement: true abilita GitHub Pages (sorgente "GitHub Actions")
       # automaticamente al primo deploy, senza toccare le impostazioni.
       - uses: actions/configure-pages@v5

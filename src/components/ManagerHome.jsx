@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getRequestsForManager, decideRequest, getUserMap } from '../data/api.js'
+import {
+  getRequestsForManager,
+  decideRequest,
+  getUserMap,
+  subscribeToRequests,
+} from '../data/api.js'
 import RequestCard from './RequestCard.jsx'
 
 // Schermata principale del manager: richieste del proprio team divise tra
@@ -10,8 +15,8 @@ export default function ManagerHome({ user }) {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('pending')
 
-  async function refresh() {
-    setLoading(true)
+  async function refresh(showSpinner = false) {
+    if (showSpinner) setLoading(true)
     const [reqs, map] = await Promise.all([
       getRequestsForManager(user.id),
       getUserMap(),
@@ -22,7 +27,11 @@ export default function ManagerHome({ user }) {
   }
 
   useEffect(() => {
-    refresh()
+    refresh(true)
+    // Aggiornamento in tempo reale: le nuove richieste dei dipendenti
+    // compaiono da sole, senza ricaricare l'app.
+    const unsubscribe = subscribeToRequests(() => refresh(false))
+    return unsubscribe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id])
 
