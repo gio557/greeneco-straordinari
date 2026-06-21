@@ -5,6 +5,7 @@ import {
   getAllIssues,
   getUserMap,
   resolveIssue,
+  returnVehicle,
   subscribeToVehicleData,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
@@ -41,14 +42,21 @@ export default function VehiclesBoard({ user }) {
 
   const byVehicle = useMemo(() => {
     const map = {}
-    for (const v of vehicles) map[v.id] = { vehicle: v, open: 0, last: null }
+    for (const v of vehicles) map[v.id] = { vehicle: v, open: 0, last: null, active: null }
     for (const i of openIssues) if (map[i.vehicleId]) map[i.vehicleId].open++
     for (const h of handovers) {
       const e = map[h.vehicleId]
-      if (e && (!e.last || h.takenAt > e.last.takenAt)) e.last = h
+      if (!e) continue
+      if (!e.last || h.takenAt > e.last.takenAt) e.last = h
+      if (!h.returnedAt && (!e.active || h.takenAt > e.active.takenAt)) e.active = h
     }
     return map
   }, [vehicles, openIssues, handovers])
+
+  const inUseCount = useMemo(
+    () => Object.values(byVehicle).filter((e) => e.active).length,
+    [byVehicle]
+  )
 
   const todayCount = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10)
@@ -58,6 +66,16 @@ export default function VehiclesBoard({ user }) {
   async function resolve(issueId) {
     try {
       await resolveIssue(issueId, user.id)
+      await refresh()
+    } catch (err) {
+      window.alert(err.message || 'Operazione non riuscita.')
+    }
+  }
+
+  async function forceReturn(vehicleId) {
+    if (!window.confirm('Forzare la riconsegna di questo mezzo?')) return
+    try {
+      await returnVehicle(vehicleId)
       await refresh()
     } catch (err) {
       window.alert(err.message || 'Operazione non riuscita.')
@@ -81,6 +99,24 @@ export default function VehiclesBoard({ user }) {
             <span className="vehicle-plate">{v.plate || '—'}</span>
           </div>
         )}
+
+        {(() => {
+          const active = byVehicle[selected]?.active
+          return (
+            <div className={`avail-banner ${active ? 'busy' : 'free'}`}>
+              {active ? (
+                <>
+                  In uso da {name(active.employeeId)} · dal {formatDateTime(active.takenAt)}
+                  <button className="btn-ghost btn-sm" onClick={() => forceReturn(selected)} style={{ marginLeft: 'auto' }}>
+                    Forza riconsegna
+                  </button>
+                </>
+              ) : (
+                'Disponibile'
+              )}
+            </div>
+          )
+        })()}
 
         <h3 className="mini-title">Segnalazioni aperte ({vIssuesOpen.length})</h3>
         {vIssuesOpen.length === 0 ? (
@@ -153,6 +189,7 @@ export default function VehiclesBoard({ user }) {
     <div className="board">
       <div className="stat-grid">
         <StatCard label="Mezzi" value={vehicles.length} />
+        <StatCard label="In uso ora" value={inUseCount} accent={inUseCount ? 'pending' : undefined} />
         <StatCard label="Segnalazioni aperte" value={openIssues.length} accent={openIssues.length ? 'pending' : undefined} />
         <StatCard label="Prese in carico oggi" value={todayCount} />
       </div>
@@ -165,16 +202,28 @@ export default function VehiclesBoard({ user }) {
         <div className="list">
           {vehicles.map((v) => {
             const info = byVehicle[v.id] || {}
+            const active = info.active
             return (
-              <button key={v.id} className="vehicle-row" onClick={() => setSelected(v.id)}>
+              <button
+                key={v.id}
+                className={`vehicle-row ${active ? 'in-use' : 'available'}`}
+                onClick={() => setSelected(v.id)}
+              >
                 <span className="vehicle-row-main">
                   <span className="vehicle-pick-name">{v.name}</span>
                   <span className="vehicle-pick-sub">
                     {v.plate || '—'}
-                    {info.last ? ` · ultima: ${name(info.last.employeeId)}, ${formatDateTime(info.last.takenAt)}` : ' · mai presa in carico'}
+                    {active
+                      ? ` · in uso da ${name(active.employeeId)}`
+                      : info.last
+                      ? ` · libero · ultima: ${name(info.last.employeeId)}, ${formatDateTime(info.last.takenAt)}`
+                      : ' · libero · mai preso'}
                   </span>
                 </span>
-                {info.open > 0 && <span className="count-pill">{info.open} aperte</span>}
+                <span className={`avail-pill ${active ? 'busy' : 'free'}`}>
+                  {active ? 'In uso' : 'Disponibile'}
+                </span>
+                {info.open > 0 && <span className="count-pill">{info.open}</span>}
                 <span className="user-card-arrow" aria-hidden>›</span>
               </button>
             )

@@ -254,9 +254,35 @@ export async function uploadVehiclePhoto(file) {
   })
 }
 
+export async function getActiveHandover(vehicleId) {
+  await delay(60)
+  return (
+    load()
+      .handovers.filter((h) => h.vehicleId === vehicleId && !h.returnedAt)
+      .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0] || null
+  )
+}
+
+export async function getOpenHandovers() {
+  await delay(60)
+  return load().handovers.filter((h) => !h.returnedAt)
+}
+
+export async function returnVehicle(vehicleId) {
+  await delay()
+  const state = load()
+  const open = state.handovers
+    .filter((h) => h.vehicleId === vehicleId && !h.returnedAt)
+    .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0]
+  if (open) open.returnedAt = new Date().toISOString()
+  save(state)
+}
+
 export async function createHandover({ vehicleId, employeeId, note, issues }) {
   await delay()
   const state = load()
+  const active = state.handovers.find((h) => h.vehicleId === vehicleId && !h.returnedAt)
+  if (active) throw new Error('Mezzo già in uso: non disponibile.')
   const newIssues = issues || []
   const now = new Date().toISOString()
   const handover = {
@@ -266,6 +292,7 @@ export async function createHandover({ vehicleId, employeeId, note, issues }) {
     conditionOk: newIssues.length === 0,
     note: (note || '').trim(),
     takenAt: now,
+    returnedAt: null,
   }
   state.handovers.push(handover)
   newIssues.forEach((it, idx) => {

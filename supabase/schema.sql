@@ -380,8 +380,12 @@ create table if not exists public.vehicle_handovers (
   employee_id  text not null references public.profiles (id),
   condition_ok boolean not null,           -- true = nessun danno nuovo dichiarato
   note         text default '',
-  taken_at     timestamptz not null default now()
+  taken_at     timestamptz not null default now(),
+  returned_at  timestamptz                  -- null = mezzo ancora in uso
 );
+
+-- Su DB già esistenti aggiunge la colonna di riconsegna.
+alter table public.vehicle_handovers add column if not exists returned_at timestamptz;
 
 create table if not exists public.vehicle_issues (
   id           text primary key,

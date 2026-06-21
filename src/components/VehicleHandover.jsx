@@ -2,41 +2,56 @@ import { useEffect, useState } from 'react'
 import {
   getVehicle,
   getOpenIssues,
+  getActiveHandover,
+  getOpenHandovers,
+  returnVehicle,
   listVehicles,
+  getUserMap,
   uploadVehiclePhoto,
   createHandover,
 } from '../data/api.js'
 import { formatDateTime } from '../utils.js'
 import QrScanner, { qrScanSupported } from './QrScanner.jsx'
 
-// Flusso di presa in carico di un mezzo da parte del dipendente.
+// Flusso di presa in carico / riconsegna di un mezzo da parte del dipendente.
 // `vehicleId` (opzionale) arriva dal QR/deep-link e salta la selezione.
 export default function VehicleHandover({ user, vehicleId, onBack }) {
   const [vehicle, setVehicle] = useState(null)
   const [openIssues, setOpenIssues] = useState([])
+  const [status, setStatus] = useState(null) // handover aperto o null (disponibile)
   const [loading, setLoading] = useState(Boolean(vehicleId))
   const [error, setError] = useState('')
 
   const [scanning, setScanning] = useState(false)
   const [vehicles, setVehicles] = useState([])
+  const [openByVehicle, setOpenByVehicle] = useState({})
+  const [userMap, setUserMap] = useState({})
 
-  const [newIssues, setNewIssues] = useState([]) // { description, file, preview }
+  const [newIssues, setNewIssues] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(null)
+
+  const nameOf = (id) => userMap[id]?.name ?? id ?? '—'
 
   async function selectVehicle(id) {
     setLoading(true)
     setError('')
     setScanning(false)
     try {
-      const v = await getVehicle(id)
+      const [v, issues, active, map] = await Promise.all([
+        getVehicle(id),
+        getOpenIssues(id),
+        getActiveHandover(id),
+        getUserMap(),
+      ])
       if (!v) {
         setError(`Mezzo "${id}" non trovato.`)
         setVehicle(null)
       } else {
-        const issues = await getOpenIssues(id)
         setVehicle(v)
         setOpenIssues(issues)
+        setStatus(active)
+        setUserMap(map)
       }
     } catch (err) {
       setError(err.message || 'Errore nel caricamento del mezzo.')
@@ -45,13 +60,18 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
     }
   }
 
-  // Caricamento iniziale: da deep-link, oppure elenco mezzi per scelta manuale.
+  async function loadList() {
+    const [vs, open, map] = await Promise.all([listVehicles(), getOpenHandovers(), getUserMap()])
+    const by = {}
+    for (const h of open) by[h.vehicleId] = h
+    setVehicles(vs)
+    setOpenByVehicle(by)
+    setUserMap(map)
+  }
+
   useEffect(() => {
-    if (vehicleId) {
-      selectVehicle(vehicleId)
-    } else {
-      listVehicles().then(setVehicles).catch(() => {})
-    }
+    if (vehicleId) selectVehicle(vehicleId)
+    else loadList().catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicleId])
 
@@ -82,7 +102,7 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
         issues.push({ description: it.description, photoUrl })
       }
       await createHandover({ vehicleId: vehicle.id, employeeId: user.id, issues })
-      setDone({ ok: issues.length === 0, count: issues.length })
+      setDone({ type: 'taken', ok: issues.length === 0, count: issues.length })
     } catch (err) {
       setError(err.message || 'Registrazione non riuscita.')
     } finally {
@@ -90,20 +110,35 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
     }
   }
 
-  // --- Schermata di conferma finale ---
+  async function doReturn() {
+    setSubmitting(true)
+    setError('')
+    try {
+      await returnVehicle(vehicle.id)
+      setDone({ type: 'returned' })
+    } catch (err) {
+      setError(err.message || 'Riconsegna non riuscita.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // --- Conferma finale ---
   if (done) {
     return (
       <main className="content">
         <div className="soon-card">
-          <span className={`handover-result ${done.ok ? 'ok' : 'warn'}`}>
-            {done.ok ? '✓' : '!'}
+          <span className={`handover-result ${done.type === 'returned' ? 'ok' : done.ok ? 'ok' : 'warn'}`}>
+            {done.type === 'returned' ? '↩' : done.ok ? '✓' : '!'}
           </span>
-          <h2 className="soon-title">Presa in carico registrata</h2>
-          <p className="soon-sub">
-            {vehicle.name}{vehicle.plate ? ` · ${vehicle.plate}` : ''}
-          </p>
+          <h2 className="soon-title">
+            {done.type === 'returned' ? 'Mezzo riconsegnato' : 'Presa in carico registrata'}
+          </h2>
+          <p className="soon-sub">{vehicle.name}{vehicle.plate ? ` · ${vehicle.plate}` : ''}</p>
           <p className="muted center soon-text">
-            {done.ok
+            {done.type === 'returned'
+              ? 'Il mezzo è ora disponibile per gli altri.'
+              : done.ok
               ? 'Hai dichiarato nessun nuovo danno. Buon lavoro!'
               : `Hai inviato ${done.count} segnalazione/i. Grazie, è stato registrato.`}
           </p>
@@ -113,7 +148,7 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
     )
   }
 
-  // --- Selezione del mezzo (nessun deep-link) ---
+  // --- Selezione del mezzo ---
   if (!vehicle) {
     return (
       <main className="content">
@@ -138,14 +173,24 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
               <p className="muted center">Caricamento…</p>
             ) : (
               <div className="list">
-                {vehicles.map((v) => (
-                  <button key={v.id} className="vehicle-pick" onClick={() => selectVehicle(v.id)}>
-                    <span className="vehicle-pick-name">{v.name}</span>
-                    <span className="vehicle-pick-sub">
-                      {v.plate || '—'}{v.department ? ` · ${v.department}` : ''}
-                    </span>
-                  </button>
-                ))}
+                {vehicles.map((v) => {
+                  const busy = openByVehicle[v.id]
+                  return (
+                    <button
+                      key={v.id}
+                      className={`vehicle-pick ${busy ? 'in-use' : 'available'}`}
+                      onClick={() => selectVehicle(v.id)}
+                    >
+                      <span className="vehicle-pick-name">{v.name}</span>
+                      <span className="vehicle-pick-sub">
+                        {v.plate || '—'}{v.department ? ` · ${v.department}` : ''}
+                      </span>
+                      <span className={`avail-pill ${busy ? 'busy' : 'free'}`}>
+                        {busy ? `In uso · ${nameOf(busy.employeeId)}` : 'Disponibile'}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             )}
             {error && <p className="error">{error}</p>}
@@ -155,10 +200,13 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
     )
   }
 
-  // --- Dichiarazione stato del mezzo selezionato ---
+  const mine = status && status.employeeId === user.id
+  const busyByOther = status && !mine
+
+  // --- Mezzo selezionato ---
   return (
     <main className="content">
-      <button className="back-link" onClick={() => { setVehicle(null); setNewIssues([]); setError('') }}>
+      <button className="back-link" onClick={() => { setVehicle(null); setStatus(null); setNewIssues([]); setError(''); loadList().catch(() => {}) }}>
         ‹ Cambia mezzo
       </button>
 
@@ -166,11 +214,35 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
         <h2 className="section-title" style={{ margin: 0 }}>{vehicle.name}</h2>
         <span className="vehicle-plate">{vehicle.plate || '—'}</span>
       </div>
-      {vehicle.department && <p className="muted small">{vehicle.department}</p>}
+      <p className={`avail-banner ${status ? 'busy' : 'free'}`}>
+        {status
+          ? `In uso da ${nameOf(status.employeeId)} · dal ${formatDateTime(status.takenAt)}`
+          : 'Disponibile'}
+      </p>
 
       {loading ? (
         <p className="muted center">Caricamento…</p>
+      ) : busyByOther ? (
+        // Occupato da un collega: non disponibile.
+        <div className="card preexist">
+          <p>Questo mezzo è attualmente <strong>in uso da {nameOf(status.employeeId)}</strong> e non è disponibile per la presa in carico.</p>
+          <p className="muted small">Riprova quando sarà stato riconsegnato.</p>
+          <button className="btn-ghost btn-block" onClick={onBack} style={{ marginTop: 10 }}>Torna indietro</button>
+        </div>
+      ) : mine ? (
+        // L'ho preso io: posso riconsegnarlo.
+        <div className="declare">
+          <div className="card preexist">
+            <p>Hai questo mezzo <strong>in carico</strong> dal {formatDateTime(status.takenAt)}.</p>
+            <p className="muted small">Quando hai finito, riconsegnalo per renderlo di nuovo disponibile.</p>
+          </div>
+          {error && <p className="error">{error}</p>}
+          <button className="btn-primary btn-block big-confirm" disabled={submitting} onClick={doReturn}>
+            {submitting ? 'Riconsegna…' : '↩ Riconsegna il mezzo'}
+          </button>
+        </div>
       ) : (
+        // Disponibile: presa in carico con dichiarazione.
         <>
           <section className="card preexist">
             <h3 className="mini-title">Segnalazioni già presenti</h3>
@@ -178,9 +250,7 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
               <p className="muted small">Nessun problema segnalato in precedenza su questo mezzo.</p>
             ) : (
               <>
-                <p className="muted small">
-                  Questi problemi risultano già segnalati (non ti vengono attribuiti):
-                </p>
+                <p className="muted small">Questi problemi risultano già segnalati (non ti vengono attribuiti):</p>
                 <ul className="issue-list">
                   {openIssues.map((i) => (
                     <li key={i.id}>
@@ -222,17 +292,13 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
                       }}
                     />
                   </label>
-                  <button className="btn-ghost btn-sm danger" onClick={() => removeIssue(idx)}>
-                    Rimuovi
-                  </button>
+                  <button className="btn-ghost btn-sm danger" onClick={() => removeIssue(idx)}>Rimuovi</button>
                 </div>
                 {it.preview && <img className="issue-preview" src={it.preview} alt="anteprima" />}
               </div>
             ))}
 
-            <button className="btn-ghost btn-block" onClick={addIssue}>
-              + Segnala un danno/anomalia
-            </button>
+            <button className="btn-ghost btn-block" onClick={addIssue}>+ Segnala un danno/anomalia</button>
 
             {error && <p className="error">{error}</p>}
 

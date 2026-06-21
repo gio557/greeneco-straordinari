@@ -253,6 +253,7 @@ function rowToHandover(h) {
     conditionOk: h.condition_ok,
     note: h.note ?? '',
     takenAt: h.taken_at,
+    returnedAt: h.returned_at ?? null,
   }
 }
 
@@ -314,9 +315,46 @@ export async function uploadVehiclePhoto(file) {
   return data.publicUrl
 }
 
+// Handover ancora aperto (mezzo in uso) per un mezzo, oppure null.
+export async function getActiveHandover(vehicleId) {
+  const { data, error } = await supabase
+    .from('vehicle_handovers')
+    .select('*')
+    .eq('vehicle_id', vehicleId)
+    .is('returned_at', null)
+    .order('taken_at', { ascending: false })
+    .limit(1)
+  if (error) throw new Error(error.message)
+  return data && data[0] ? rowToHandover(data[0]) : null
+}
+
+// Tutti gli handover aperti (mezzi attualmente in uso).
+export async function getOpenHandovers() {
+  const { data, error } = await supabase
+    .from('vehicle_handovers')
+    .select('*')
+    .is('returned_at', null)
+  if (error) throw new Error(error.message)
+  return data.map(rowToHandover)
+}
+
+// Riconsegna: chiude l'handover aperto del mezzo.
+export async function returnVehicle(vehicleId) {
+  const { error } = await supabase
+    .from('vehicle_handovers')
+    .update({ returned_at: new Date().toISOString() })
+    .eq('vehicle_id', vehicleId)
+    .is('returned_at', null)
+  if (error) throw new Error(error.message)
+}
+
 // Registra una presa in carico. `issues` è l'elenco dei NUOVI danni segnalati
 // (ognuno { description, photoUrl }). conditionOk = true se nessun danno nuovo.
 export async function createHandover({ vehicleId, employeeId, note, issues }) {
+  // Sicurezza: non si può prendere un mezzo già in uso.
+  const active = await getActiveHandover(vehicleId)
+  if (active) throw new Error('Mezzo già in uso: non disponibile.')
+
   const newIssues = issues || []
   const conditionOk = newIssues.length === 0
   const handoverId = `hov-${Date.now()}`

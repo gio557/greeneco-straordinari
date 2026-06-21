@@ -1224,3 +1224,33 @@ code {
   border-radius: 8px;
   flex: none;
 }
+
+/* Disponibilità mezzi (verde = libero, rosso = in uso) */
+.vehicle-pick.available,
+.vehicle-row.available { border-left: 5px solid var(--green); }
+.vehicle-pick.in-use,
+.vehicle-row.in-use { border-left: 5px solid var(--red); }
+
+.avail-pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  align-self: flex-start;
+  white-space: nowrap;
+}
+.avail-pill.free { background: var(--green-bg); color: var(--green); }
+.avail-pill.busy { background: var(--red-bg); color: var(--red); }
+
+.avail-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  margin: 10px 0 4px;
+}
+.avail-banner.free { background: var(--green-bg); color: var(--green); }
+.avail-banner.busy { background: var(--red-bg); color: var(--red); }
