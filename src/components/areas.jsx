@@ -54,6 +54,20 @@ function WarehouseIcon() {
   )
 }
 
+// Cantieri: gru da cantiere
+function CraneIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M3 21h7" />
+      <path d="M6.5 21V5.5" />
+      <path d="M3.5 8.5 6.5 5.5 9.5 8.5" />
+      <path d="M6.5 5.5H19" />
+      <path d="M17 5.5V9" />
+      <path d="M15.5 9h3l-1.5 2.2z" />
+    </svg>
+  )
+}
+
 // Elenco delle aree. L'ordine qui determina l'ordine in schermata.
 export const AREAS = [
   {
@@ -86,6 +100,14 @@ export const AREAS = [
     subtitle: 'Registra i materiali in uscita',
     accent: '#b7791f',
     Icon: WarehouseIcon,
+    ready: false,
+  },
+  {
+    id: 'cantieri',
+    title: 'Stato d’avanzamento cantieri',
+    subtitle: 'Monitora l’avanzamento dei cantieri attivi',
+    accent: '#7a5195',
+    Icon: CraneIcon,
     ready: false,
   },
 ]
