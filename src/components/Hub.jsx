@@ -7,7 +7,7 @@ export default function Hub({ onSelect }) {
     <div className="hub">
       <div className="login-brand">
         <img className="login-logo" src="./greeneco-logo.jpeg" alt="greeneco wastewater" />
-        <h1>Servizi di campo</h1>
+        <h1>Operations</h1>
         <p>Scegli un’area per iniziare</p>
       </div>
 

@@ -1,6 +1,6 @@
 {
-  "name": "Gestione Straordinari",
-  "short_name": "Straordinari",
+  "name": "Operations",
+  "short_name": "Operations",
   "description": "Richieste di ore straordinarie per dipendenti e manager",
   "start_url": "./",
   "scope": "./",

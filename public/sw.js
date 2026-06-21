@@ -1,6 +1,6 @@
 // Service worker minimale: cache "app shell" per avvio offline.
 // Strategia: network-first per la navigazione, cache-first per gli asset.
-const CACHE = 'straordinari-v1'
+const CACHE = 'operations-v1'
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg']
 
 self.addEventListener('install', (event) => {

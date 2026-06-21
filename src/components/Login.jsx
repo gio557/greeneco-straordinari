@@ -27,7 +27,7 @@ export default function Login({ onLogin, onBack }) {
       )}
       <div className="login-brand">
         <img className="login-logo" src="./greeneco-logo.jpeg" alt="greeneco wastewater" />
-        <h1>Gestione Straordinari</h1>
+        <h1>Operations</h1>
         <p>Richieste di ore straordinarie</p>
       </div>
 

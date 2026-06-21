@@ -1,4 +1,4 @@
-# Gestione Straordinari — App (PWA)
+# Operations — App (PWA)
 
 Applicazione per la gestione delle **richieste di ore straordinarie** da parte
 dei dipendenti, con **approvazione/rifiuto** da parte dei manager abilitati.
