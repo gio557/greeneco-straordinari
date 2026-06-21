@@ -661,3 +661,29 @@ button:disabled {
   margin-top: 18px;
   line-height: 1.5;
 }
+
+/* ---------- Indicatore modalità dati (demo / database centrale) ---------- */
+.data-mode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 28px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.data-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.data-mode-supabase {
+  color: var(--green);
+}
+
+.data-mode-supabase .data-dot {
+  background: var(--green);
+}

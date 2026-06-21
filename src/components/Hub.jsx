@@ -1,4 +1,5 @@
 import { AREAS } from './areas.jsx'
+import { dataMode } from '../data/api.js'
 
 // Schermata iniziale dell'app: l'utente sceglie in quale macro-area entrare.
 export default function Hub({ onSelect }) {
@@ -30,6 +31,13 @@ export default function Hub({ onSelect }) {
           </button>
         ))}
       </div>
+
+      <p className={`data-mode data-mode-${dataMode}`}>
+        <span className="data-dot" aria-hidden />
+        {dataMode === 'supabase'
+          ? 'Database centrale attivo · dati condivisi in tempo reale'
+          : 'Modalità demo · dati salvati solo su questo dispositivo'}
+      </p>
     </div>
   )
 }
