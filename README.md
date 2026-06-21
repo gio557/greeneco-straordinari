@@ -14,7 +14,7 @@ può aggiungere alla schermata Home come una normale app.
 > sono configurate, l'app funziona in **modalità demo** con dati locali di
 > esempio (utile per provarla).
 
-**Demo online:** <https://gio557.github.io/greeneco-straordinari/>
+**Demo online:** <https://gio557.github.io/greeneco-operations/>
 
 ## Avvio in locale
 
@@ -47,7 +47,7 @@ console del browser: `localStorage.clear()` e ricarica.
 ## Struttura del progetto
 
 ```
-greeneco-straordinari/
+greeneco-operations/
 ├─ index.html                 # pagina + manifest PWA
 ├─ public/
 │  ├─ manifest.webmanifest    # configurazione installazione su telefono
@@ -116,7 +116,7 @@ solo l'archivio da usare:
 - **GitHub Pages (automatico):** questo repository include
   `.github/workflows/deploy.yml`. A ogni push sul branch `main` l'app viene
   compilata e pubblicata automaticamente su
-  <https://gio557.github.io/greeneco-straordinari/> (Pages viene anche abilitato
+  <https://gio557.github.io/greeneco-operations/> (Pages viene anche abilitato
   da solo al primo deploy). Non serve configurare nulla a mano.
 - **Altri hosting statici:** in alternativa puoi pubblicare la cartella `dist/`
   (generata da `npm run build`) su Netlify, Vercel, ecc. Gli utenti aprono il
