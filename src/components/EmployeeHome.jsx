@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { getRequestsForEmployee, subscribeToRequests } from '../data/api.js'
+import { useState } from 'react'
+import { getRequestsForEmployee } from '../data/api.js'
+import { useLiveData } from '../data/useLiveData.js'
 import RequestCard from './RequestCard.jsx'
 import NewRequest from './NewRequest.jsx'
 
@@ -16,14 +17,9 @@ export default function EmployeeHome({ user }) {
     setLoading(false)
   }
 
-  useEffect(() => {
-    refresh(true)
-    // Aggiornamento in tempo reale: se il manager decide su una richiesta,
-    // la lista si aggiorna da sola senza ricaricare l'app.
-    const unsubscribe = subscribeToRequests(() => refresh(false))
-    return unsubscribe
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.id])
+  // Se il manager decide su una richiesta, la lista si aggiorna da sola
+  // (realtime), anche tornando sull'app dopo averla lasciata in background.
+  useLiveData(refresh, [user.id])
 
   const pending = requests.filter((r) => r.status === 'pending').length
 

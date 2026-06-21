@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   getRequestsForManager,
   decideRequest,
   getUserMap,
-  subscribeToRequests,
 } from '../data/api.js'
+import { useLiveData } from '../data/useLiveData.js'
 import RequestCard from './RequestCard.jsx'
 
 // Schermata principale del manager: richieste del proprio team divise tra
@@ -26,14 +26,9 @@ export default function ManagerHome({ user }) {
     setLoading(false)
   }
 
-  useEffect(() => {
-    refresh(true)
-    // Aggiornamento in tempo reale: le nuove richieste dei dipendenti
-    // compaiono da sole, senza ricaricare l'app.
-    const unsubscribe = subscribeToRequests(() => refresh(false))
-    return unsubscribe
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.id])
+  // Le nuove richieste dei dipendenti compaiono da sole (realtime), anche
+  // tornando sull'app dopo averla lasciata in background.
+  useLiveData(refresh, [user.id])
 
   const pending = requests.filter((r) => r.status === 'pending')
   const history = requests.filter((r) => r.status !== 'pending')
