@@ -1254,3 +1254,20 @@ code {
 }
 .avail-banner.free { background: var(--green-bg); color: var(--green); }
 .avail-banner.busy { background: var(--red-bg); color: var(--red); }
+
+/* Sezione "Amministrazione" nell'hub (solo admin) */
+.admin-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.admin-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.admin-card { border-style: dashed; }

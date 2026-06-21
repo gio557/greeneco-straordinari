@@ -6,6 +6,7 @@ import Login from './components/Login.jsx'
 import Header from './components/Header.jsx'
 import EmployeeHome from './components/EmployeeHome.jsx'
 import Dashboard from './components/Dashboard.jsx'
+import UsersAdmin from './components/UsersAdmin.jsx'
 import VehicleHandover from './components/VehicleHandover.jsx'
 import VehiclesDashboard from './components/VehiclesDashboard.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
@@ -88,6 +89,17 @@ export default function App() {
       <div className={isStaff ? 'app app-wide' : 'app'}>
         <Header user={user} onLogout={handleLogout} onBack={backToHub} />
         {isStaff ? <Dashboard user={user} /> : <EmployeeHome user={user} />}
+      </div>
+    )
+  }
+
+  if (area === 'utenti' && user.role === 'admin') {
+    return (
+      <div className="app app-wide">
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} />
+        <main className="content dashboard">
+          <UsersAdmin admin={user} />
+        </main>
       </div>
     )
   }
