@@ -689,6 +689,72 @@ button:disabled {
 }
 
 /* =========================================================================
+   Schermata iniziale: scelta del tipo di accesso (due pulsantoni)
+   ========================================================================= */
+.role-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.role-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 20px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  border-left: 5px solid var(--navy);
+}
+
+.role-btn:active {
+  transform: translateY(1px);
+}
+
+.role-btn-employee {
+  border-left-color: var(--green);
+}
+
+.role-btn-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.role-btn-employee .role-btn-title {
+  color: var(--green);
+}
+
+.role-btn-sub {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Barra utente in cima all'hub (connesso come… · Esci) */
+.hub-userbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.hub-user {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.hub-userbar .btn-ghost {
+  padding: 6px 14px;
+}
+
+/* =========================================================================
    Dashboard manager / admin
    ========================================================================= */
 

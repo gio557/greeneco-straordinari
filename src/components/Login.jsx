@@ -1,12 +1,19 @@
 import { useState } from 'react'
 
 // Schermata di accesso: ID (o email) + password.
-// La verifica delle credenziali avviene lato database (vedi supabase/schema.sql).
-export default function Login({ onLogin, onBack }) {
+// `role` ('staff' | 'employee') è solo il percorso scelto nella schermata
+// iniziale e personalizza intestazione e suggerimenti: il ruolo effettivo
+// dell'utente è determinato dalle credenziali (verifica lato database).
+export default function Login({ onLogin, onBack, role }) {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const isStaff = role === 'staff'
+  const subtitle = isStaff
+    ? 'Accesso manager / amministratore'
+    : 'Accesso dipendente'
 
   async function submit(e) {
     e.preventDefault()
@@ -23,12 +30,12 @@ export default function Login({ onLogin, onBack }) {
   return (
     <div className="login">
       {onBack && (
-        <button className="back-link" onClick={onBack}>‹ Torna alle aree</button>
+        <button className="back-link" onClick={onBack}>‹ Indietro</button>
       )}
       <div className="login-brand">
         <img className="login-logo" src="./greeneco-logo.jpeg" alt="greeneco wastewater" />
         <h1>Operations</h1>
-        <p>Richieste di ore straordinarie</p>
+        <p>{subtitle}</p>
       </div>
 
       <form className="login-form" onSubmit={submit}>
@@ -41,7 +48,7 @@ export default function Login({ onLogin, onBack }) {
             autoCapitalize="none"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="es. emp-1"
+            placeholder={isStaff ? 'es. mgr-1' : 'es. emp-1'}
             required
           />
         </label>
@@ -65,8 +72,12 @@ export default function Login({ onLogin, onBack }) {
       </form>
 
       <p className="login-hint">
-        Account demo — Admin: <code>admin</code> / <code>admin123</code> ·
-        {' '}Altri utenti: <code>mgr-1</code>, <code>emp-1</code>… / <code>demo123</code>
+        {isStaff ? (
+          <>Account demo — Admin: <code>admin</code> / <code>admin123</code> ·
+          {' '}Manager: <code>mgr-1</code> / <code>demo123</code></>
+        ) : (
+          <>Account demo — <code>emp-1</code>, <code>emp-2</code>… / <code>demo123</code></>
+        )}
       </p>
     </div>
   )

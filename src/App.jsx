@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { login } from './data/api.js'
+import Welcome from './components/Welcome.jsx'
 import Hub from './components/Hub.jsx'
 import Login from './components/Login.jsx'
 import Header from './components/Header.jsx'
@@ -10,9 +11,12 @@ import ComingSoon from './components/ComingSoon.jsx'
 const SESSION_KEY = 'straordinari_session'
 
 export default function App() {
-  // Area selezionata nella schermata iniziale (null = mostra l'hub).
-  const [area, setArea] = useState(null)
   const [user, setUser] = useState(null)
+  // Percorso di accesso scelto nella schermata iniziale (null = mostra i due
+  // pulsanti; 'staff' | 'employee' = mostra il form di login).
+  const [authRole, setAuthRole] = useState(null)
+  // Area selezionata nell'hub (null = mostra l'hub).
+  const [area, setArea] = useState(null)
   const [ready, setReady] = useState(false)
 
   // Ripristina la sessione precedente all'avvio (salviamo il profilo, non la
@@ -36,6 +40,8 @@ export default function App() {
   function handleLogout() {
     localStorage.removeItem(SESSION_KEY)
     setUser(null)
+    setAuthRole(null)
+    setArea(null)
   }
 
   function backToHub() {
@@ -44,12 +50,22 @@ export default function App() {
 
   if (!ready) return null
 
-  // Schermata iniziale: scelta della macro-area.
-  if (!area) return <Hub onSelect={setArea} />
+  // --- Non autenticato: scelta del tipo di accesso, poi login ---
+  if (!user) {
+    if (!authRole) return <Welcome onChoose={setAuthRole} />
+    return (
+      <Login
+        role={authRole}
+        onLogin={handleLogin}
+        onBack={() => setAuthRole(null)}
+      />
+    )
+  }
 
-  // Area "Gestione straordinari": login + schermata in base al ruolo.
+  // --- Autenticato: hub delle aree, poi schermata in base al ruolo ---
+  if (!area) return <Hub onSelect={setArea} user={user} onLogout={handleLogout} />
+
   if (area === 'straordinari') {
-    if (!user) return <Login onLogin={handleLogin} onBack={backToHub} />
     const isStaff = user.role === 'manager' || user.role === 'admin'
     return (
       <div className={isStaff ? 'app app-wide' : 'app'}>

@@ -1,10 +1,18 @@
 import { AREAS } from './areas.jsx'
 import { dataMode } from '../data/api.js'
 
-// Schermata iniziale dell'app: l'utente sceglie in quale macro-area entrare.
-export default function Hub({ onSelect }) {
+// Hub delle aree: dopo l'accesso, l'utente sceglie in quale macro-area entrare.
+export default function Hub({ onSelect, user, onLogout }) {
   return (
     <div className="hub">
+      {user && (
+        <div className="hub-userbar">
+          <span className="hub-user">
+            {user.name}{user.department ? ` · ${user.department}` : ''}
+          </span>
+          <button className="btn-ghost btn-sm" onClick={onLogout}>Esci</button>
+        </div>
+      )}
       <div className="login-brand">
         <img className="login-logo" src="./greeneco-logo.jpeg" alt="greeneco wastewater" />
         <h1>Operations</h1>
