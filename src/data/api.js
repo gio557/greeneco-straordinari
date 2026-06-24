@@ -57,5 +57,6 @@ export const subscribeToVehicleData = impl.subscribeToVehicleData
 export const getLastClocking = impl.getLastClocking
 export const getMyClockings = impl.getMyClockings
 export const getRecentClockings = impl.getRecentClockings
+export const getClockingsInRange = impl.getClockingsInRange
 export const createClocking = impl.createClocking
 export const subscribeToClockings = impl.subscribeToClockings

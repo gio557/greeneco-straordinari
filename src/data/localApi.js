@@ -408,6 +408,13 @@ export async function getRecentClockings(limit = 300) {
     .slice(0, limit)
 }
 
+export async function getClockingsInRange(fromISO, toISO) {
+  await delay()
+  return load()
+    .clockings.filter((c) => c.punchedAt >= fromISO && c.punchedAt < toISO)
+    .sort((a, b) => a.punchedAt.localeCompare(b.punchedAt))
+}
+
 export async function createClocking({ employeeId, kind, lat, lng, accuracy }) {
   await delay()
   const state = load()
