@@ -1325,3 +1325,63 @@ code {
 }
 .privacy-list { padding-left: 18px; }
 .privacy-list li { margin: 4px 0; }
+
+/* --- Riepilogo mensile timbrature (cartellino) --- */
+.ts-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.ts-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ts-field > span {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ts-field input,
+.ts-field select {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fff;
+}
+.ts-field-grow { flex: 1 1 200px; }
+.ts-field-grow select { width: 100%; }
+.ts-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.ts-actions .btn-ghost {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+.ts-actions .btn-ghost:disabled { opacity: .5; }
+
+.ts-summary { grid-template-columns: repeat(3, 1fr); }
+.ts-caption { margin: 0 0 12px; }
+
+.ts-table td.num,
+.ts-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ts-table tr.ts-weekend td { background: #f6f8fa; color: var(--muted); }
+.ts-table td.ts-ot { color: var(--green); font-weight: 700; }
+.ts-table td.ts-notes { color: #b0623a; font-size: 13px; }
+.ts-table tfoot .ts-total-row td {
+  border-top: 2px solid var(--line);
+  background: #fbfcfd;
+}
+
+@media (max-width: 640px) {
+  .ts-actions { margin-left: 0; width: 100%; }
+  .ts-actions .btn-ghost { flex: 1; }
+  .ts-summary { grid-template-columns: repeat(3, 1fr); }
+}

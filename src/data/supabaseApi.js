@@ -508,6 +508,21 @@ export async function getRecentClockings(limit = 300) {
   return data.map(rowToClocking)
 }
 
+// Tutte le timbrature in un intervallo [fromISO, toISO). Usata dal riepilogo
+// mensile: si passa un intervallo leggermente più ampio del mese e si
+// raggruppa per giorno lato client (fuso orario locale).
+export async function getClockingsInRange(fromISO, toISO) {
+  const { data, error } = await supabase
+    .from('time_clockings')
+    .select('*')
+    .gte('punched_at', fromISO)
+    .lt('punched_at', toISO)
+    .order('punched_at', { ascending: true })
+    .limit(10000)
+  if (error) throw new Error(error.message)
+  return data.map(rowToClocking)
+}
+
 export async function createClocking({ employeeId, kind, lat, lng, accuracy }) {
   const { data, error } = await supabase
     .from('time_clockings')

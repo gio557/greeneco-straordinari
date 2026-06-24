@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react'
 import { getRecentClockings, getUserMap, subscribeToClockings } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { formatDateTime } from '../utils.js'
+import MonthlyTimesheet from './MonthlyTimesheet.jsx'
 
 // Vista presenze per manager/admin. Il manager vede il proprio team, l'admin
 // tutti. (Su impianto prototipo il filtro è applicativo; con auth reale + RLS
 // diventerà un controllo d'accesso forte.)
 export default function TimbratureBoard({ user }) {
   const isAdmin = user.role === 'admin'
+  const [view, setView] = useState('live')
   const [clockings, setClockings] = useState([])
   const [userMap, setUserMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -48,6 +50,24 @@ export default function TimbratureBoard({ user }) {
 
   return (
     <main className="content dashboard">
+      <div className="dash-tabs">
+        <button
+          className={view === 'live' ? 'dash-tab dash-tab-active' : 'dash-tab'}
+          onClick={() => setView('live')}
+        >
+          Tempo reale
+        </button>
+        <button
+          className={view === 'month' ? 'dash-tab dash-tab-active' : 'dash-tab'}
+          onClick={() => setView('month')}
+        >
+          Riepilogo mensile
+        </button>
+      </div>
+
+      {view === 'month' ? (
+        <MonthlyTimesheet user={user} />
+      ) : (
       <div className="board">
         <div className="stat-grid">
           <StatCard label="In servizio ora" value={inService.length} accent={inService.length ? 'approved' : undefined} />
@@ -104,6 +124,7 @@ export default function TimbratureBoard({ user }) {
           </div>
         )}
       </div>
+      )}
     </main>
   )
 }
