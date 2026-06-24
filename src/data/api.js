@@ -52,3 +52,10 @@ export const adminListVehicles = impl.adminListVehicles
 export const adminUpsertVehicle = impl.adminUpsertVehicle
 export const adminDeleteVehicle = impl.adminDeleteVehicle
 export const subscribeToVehicleData = impl.subscribeToVehicleData
+
+// Timbrature presenze
+export const getLastClocking = impl.getLastClocking
+export const getMyClockings = impl.getMyClockings
+export const getRecentClockings = impl.getRecentClockings
+export const createClocking = impl.createClocking
+export const subscribeToClockings = impl.subscribeToClockings

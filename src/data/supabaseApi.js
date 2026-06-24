@@ -459,3 +459,78 @@ export function subscribeToVehicleData(onChange) {
     supabase.removeChannel(channel)
   }
 }
+
+// ===========================================================================
+// TIMBRATURE PRESENZE (prototipo)
+// ===========================================================================
+
+function rowToClocking(c) {
+  return {
+    id: c.id,
+    employeeId: c.employee_id,
+    kind: c.kind,
+    punchedAt: c.punched_at,
+    lat: c.lat,
+    lng: c.lng,
+    accuracy: c.accuracy,
+  }
+}
+
+export async function getLastClocking(employeeId) {
+  const { data, error } = await supabase
+    .from('time_clockings')
+    .select('*')
+    .eq('employee_id', employeeId)
+    .order('punched_at', { ascending: false })
+    .limit(1)
+  if (error) throw new Error(error.message)
+  return data && data[0] ? rowToClocking(data[0]) : null
+}
+
+export async function getMyClockings(employeeId, limit = 50) {
+  const { data, error } = await supabase
+    .from('time_clockings')
+    .select('*')
+    .eq('employee_id', employeeId)
+    .order('punched_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return data.map(rowToClocking)
+}
+
+export async function getRecentClockings(limit = 300) {
+  const { data, error } = await supabase
+    .from('time_clockings')
+    .select('*')
+    .order('punched_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return data.map(rowToClocking)
+}
+
+export async function createClocking({ employeeId, kind, lat, lng, accuracy }) {
+  const { data, error } = await supabase
+    .from('time_clockings')
+    .insert({
+      id: `clk-${Date.now()}`,
+      employee_id: employeeId,
+      kind,
+      lat: lat ?? null,
+      lng: lng ?? null,
+      accuracy: accuracy ?? null,
+    })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return rowToClocking(data)
+}
+
+export function subscribeToClockings(onChange) {
+  const channel = supabase
+    .channel('time_clockings_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'time_clockings' }, onChange)
+    .subscribe()
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
