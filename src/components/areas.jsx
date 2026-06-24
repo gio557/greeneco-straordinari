@@ -54,22 +54,29 @@ function WarehouseIcon() {
   )
 }
 
-// Cantieri: gru da cantiere
-function CraneIcon() {
+// Timbrature presenze: impronta (timbratura)
+function FingerprintIcon() {
   return (
     <svg {...svgProps}>
-      <path d="M3 21h7" />
-      <path d="M6.5 21V5.5" />
-      <path d="M3.5 8.5 6.5 5.5 9.5 8.5" />
-      <path d="M6.5 5.5H19" />
-      <path d="M17 5.5V9" />
-      <path d="M15.5 9h3l-1.5 2.2z" />
+      <path d="M5 11a7 7 0 0 1 13-3.4" />
+      <path d="M8.5 12.4a3.5 3.5 0 0 1 7 0v1.8a7 7 0 0 1-.5 2.6" />
+      <path d="M12 11.4V16a5 5 0 0 0 .7 2.5" />
+      <path d="M6.4 15.4A8 8 0 0 1 6 13" />
+      <path d="M15.6 18.7A9 9 0 0 0 16.9 14" />
     </svg>
   )
 }
 
 // Elenco delle aree. L'ordine qui determina l'ordine in schermata.
 export const AREAS = [
+  {
+    id: 'timbrature',
+    title: 'Timbrature Presenze',
+    subtitle: 'Registra entrate e uscite del personale',
+    accent: '#1f7a8c',
+    Icon: FingerprintIcon,
+    ready: false,
+  },
   {
     id: 'straordinari',
     title: 'Gestione richieste straordinarie',
@@ -100,14 +107,6 @@ export const AREAS = [
     subtitle: 'Registra i materiali in uscita',
     accent: '#b7791f',
     Icon: WarehouseIcon,
-    ready: false,
-  },
-  {
-    id: 'cantieri',
-    title: 'Stato d’avanzamento cantieri',
-    subtitle: 'Monitora l’avanzamento dei cantieri attivi',
-    accent: '#7a5195',
-    Icon: CraneIcon,
     ready: false,
   },
 ]
