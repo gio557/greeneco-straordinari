@@ -75,7 +75,7 @@ export const AREAS = [
     subtitle: 'Registra entrate e uscite del personale',
     accent: '#1f7a8c',
     Icon: FingerprintIcon,
-    ready: false,
+    ready: true,
   },
   {
     id: 'straordinari',

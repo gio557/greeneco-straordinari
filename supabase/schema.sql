@@ -511,3 +511,40 @@ insert into public.vehicles (id, name, plate, department) values
   ('veh-2', 'Iveco Daily',    'EF456GH', 'Produzione'),
   ('veh-3', 'Renault Kangoo', 'IJ789KL', 'Manutenzione')
 on conflict (id) do nothing;
+
+-- ===========================================================================
+-- TIMBRATURE PRESENZE  (PROTOTIPO DIMOSTRATIVO — non per dati reali)
+-- ---------------------------------------------------------------------------
+-- ATTENZIONE: gestisce dati personali (identità, orario, POSIZIONE GPS). Per un
+-- uso reale serve: autenticazione sicura (Supabase Auth) + RLS per-utente,
+-- informativa validata, base giuridica, valutazione DPIA e — in Italia — art. 4
+-- Statuto dei Lavoratori. In questa fase è solo dimostrativo (chiave anon).
+-- Privacy-by-design: la posizione è registrata SOLO all'atto della timbratura.
+-- ===========================================================================
+
+create table if not exists public.time_clockings (
+  id          text primary key,
+  employee_id text not null references public.profiles (id) on delete cascade,
+  kind        text not null check (kind in ('in', 'out')),
+  punched_at  timestamptz not null default now(),
+  lat         double precision,
+  lng         double precision,
+  accuracy    double precision,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists time_clockings_employee_idx on public.time_clockings (employee_id);
+
+alter table public.time_clockings enable row level security;
+
+drop policy if exists "clockings_select_anon" on public.time_clockings;
+create policy "clockings_select_anon" on public.time_clockings for select to anon, authenticated using (true);
+drop policy if exists "clockings_insert_anon" on public.time_clockings;
+create policy "clockings_insert_anon" on public.time_clockings for insert to anon, authenticated with check (true);
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='time_clockings') then
+    alter publication supabase_realtime add table public.time_clockings;
+  end if;
+end $$;

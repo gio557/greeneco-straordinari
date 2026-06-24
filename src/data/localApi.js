@@ -9,7 +9,7 @@
 
 import { USERS, REQUESTS, CREDENTIALS, VEHICLES } from './seed.js'
 
-const STORAGE_KEY = 'straordinari_state_v3'
+const STORAGE_KEY = 'straordinari_state_v4'
 
 function load() {
   try {
@@ -25,6 +25,7 @@ function load() {
     vehicles: VEHICLES,
     handovers: [],
     issues: [],
+    clockings: [],
   }
   save(initial)
   return initial
@@ -215,6 +216,7 @@ export async function resetDemoData() {
     vehicles: VEHICLES,
     handovers: [],
     issues: [],
+    clockings: [],
   })
 }
 
@@ -376,5 +378,54 @@ export async function adminDeleteVehicle(adminId, vehicleId) {
 }
 
 export function subscribeToVehicleData() {
+  return () => {}
+}
+
+// --- Timbrature presenze ---------------------------------------------------
+
+export async function getLastClocking(employeeId) {
+  await delay(60)
+  return (
+    load()
+      .clockings.filter((c) => c.employeeId === employeeId)
+      .sort((a, b) => b.punchedAt.localeCompare(a.punchedAt))[0] || null
+  )
+}
+
+export async function getMyClockings(employeeId, limit = 50) {
+  await delay()
+  return load()
+    .clockings.filter((c) => c.employeeId === employeeId)
+    .sort((a, b) => b.punchedAt.localeCompare(a.punchedAt))
+    .slice(0, limit)
+}
+
+export async function getRecentClockings(limit = 300) {
+  await delay()
+  return load()
+    .clockings.slice()
+    .sort((a, b) => b.punchedAt.localeCompare(a.punchedAt))
+    .slice(0, limit)
+}
+
+export async function createClocking({ employeeId, kind, lat, lng, accuracy }) {
+  await delay()
+  const state = load()
+  const clocking = {
+    id: `clk-${Date.now()}`,
+    employeeId,
+    kind,
+    punchedAt: new Date().toISOString(),
+    lat: lat ?? null,
+    lng: lng ?? null,
+    accuracy: accuracy ?? null,
+  }
+  state.clockings = state.clockings || []
+  state.clockings.push(clocking)
+  save(state)
+  return clocking
+}
+
+export function subscribeToClockings() {
   return () => {}
 }

@@ -9,6 +9,8 @@ import Dashboard from './components/Dashboard.jsx'
 import UsersAdmin from './components/UsersAdmin.jsx'
 import VehicleHandover from './components/VehicleHandover.jsx'
 import VehiclesDashboard from './components/VehiclesDashboard.jsx'
+import Timbrature from './components/Timbrature.jsx'
+import TimbratureBoard from './components/TimbratureBoard.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 const SESSION_KEY = 'straordinari_session'
@@ -109,6 +111,15 @@ export default function App() {
       <div className={isStaff ? 'app app-wide' : 'app'}>
         <Header user={user} onLogout={handleLogout} onBack={backToHub} />
         {isStaff ? <VehiclesDashboard user={user} /> : <VehicleHandover user={user} onBack={backToHub} />}
+      </div>
+    )
+  }
+
+  if (area === 'timbrature') {
+    return (
+      <div className={isStaff ? 'app app-wide' : 'app'}>
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} />
+        {isStaff ? <TimbratureBoard user={user} /> : <Timbrature user={user} />}
       </div>
     )
   }
