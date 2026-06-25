@@ -55,6 +55,14 @@ const STATE_LABEL = {
   break: 'In pausa',
 }
 
+// Suggerimento contestuale per chiarire il flusso (in particolare il ritorno).
+const STATE_HINT = {
+  off: 'Inizia la giornata: «Inizio viaggio» se devi raggiungere il cliente, oppure «Inizio lavoro» se sei già sul posto.',
+  travel: 'Quando arrivi dal cliente premi «Inizio lavoro». Al rientro, «Fine giornata» chiude anche il viaggio di ritorno in corso (un solo tocco).',
+  work: 'Per il rientro premi «Inizio viaggio»; se vai da un altro cliente, premi di nuovo «Inizio lavoro» all’arrivo.',
+  break: 'Al termine della pausa premi «Riprendi lavoro». Il tempo di pausa non è conteggiato.',
+}
+
 const ACTIVITY_ICON = { travel: '🚗', work: '🔧', break: '⏸', end: '🏁' }
 
 export default function Timbrature({ user }) {
@@ -137,6 +145,8 @@ export default function Timbrature({ user }) {
           </button>
         ))}
       </div>
+
+      <p className="muted small center clock-hint">{STATE_HINT[state]}</p>
 
       <p className="muted center small" style={{ marginTop: 10 }}>
         📍 La posizione è rilevata solo ora, all'atto della timbratura.

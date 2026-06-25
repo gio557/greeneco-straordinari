@@ -1293,6 +1293,7 @@ code {
 .clock-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
 
 .clock-actions { display: flex; flex-direction: column; gap: 10px; }
+.clock-hint { margin-top: 12px; line-height: 1.45; }
 .clock-btn { font-size: 18px; padding: 18px; }
 .clock-btn.work { background: var(--green); }
 .clock-btn.travel { background: #1f7a8c; }
