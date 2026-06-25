@@ -62,3 +62,32 @@ test('combinazione: offline + senza posizione → da verificare', () => {
   assert.equal(isToVerify(c), true)
   assert.equal(clockingChecks(c).length, 2)
 })
+
+test('posizione imprecisa (raggio ampio): warn → da verificare', () => {
+  const c = { ...base, accuracy: 1500 }
+  const f = clockingChecks(c).find((x) => x.code === 'low-accuracy')
+  assert.ok(f)
+  assert.equal(f.level, 'warn')
+  assert.match(f.label, /1\.5 km/)
+  assert.equal(isToVerify(c), true)
+})
+
+test('precisione buona: nessuna segnalazione', () => {
+  const c = { ...base, accuracy: 25 }
+  assert.equal(clockingChecks(c).length, 0)
+})
+
+test('senza posizione non genera anche "imprecisa"', () => {
+  const c = { ...base, lat: null, lng: null, accuracy: 3000 }
+  const codes = clockingChecks(c).map((x) => x.code)
+  assert.deepEqual(codes, ['no-gps'])
+})
+
+test('GPS diverso da IP (Livello 3): warn → da verificare', () => {
+  const c = { ...base, ipMismatch: true, ipDistanceKm: 540 }
+  const f = clockingChecks(c).find((x) => x.code === 'ip')
+  assert.ok(f)
+  assert.equal(f.level, 'warn')
+  assert.match(f.label, /540 km/)
+  assert.equal(isToVerify(c), true)
+})

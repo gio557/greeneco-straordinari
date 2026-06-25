@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getLastClocking, getMyClockings, createClocking, subscribeToClockings } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
+import { requestIpCheck } from '../data/ipCheck.js'
 import { formatDateTime } from '../utils.js'
 import { normalizeKind, ACTIVITIES } from '../timesheet.js'
 import PrivacyNotice from './PrivacyNotice.jsx'
@@ -9,15 +10,28 @@ const consentKey = (userId) => `timbra_consent_${userId}`
 
 // Rileva la posizione SOLO ora (all'atto della timbratura). Risolve a null se
 // non disponibile o negata, senza bloccare la timbratura.
-function getPosition() {
+//
+// Due stadi: prima si chiede il GPS ad alta precisione (attesa breve); se non
+// risponde in tempo, si ripiega su un fix approssimato (cella/WiFi) invece di
+// restare senza posizione. La precisione (`accuracy`, raggio in metri) viene
+// sempre registrata: un raggio ampio indica un fix grossolano (es. GPS spento).
+function getPositionOnce(options) {
   return new Promise((resolve) => {
     if (!('geolocation' in navigator)) return resolve(null)
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      options
     )
   })
+}
+
+async function getPosition() {
+  // 1) GPS preciso, attesa breve.
+  const precise = await getPositionOnce({ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 })
+  if (precise) return precise
+  // 2) Ripiego approssimato (cella/WiFi): meglio una posizione grossolana che nessuna.
+  return getPositionOnce({ enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 })
 }
 
 // Stato corrente in base all'ultima timbratura.
@@ -103,7 +117,9 @@ export default function Timbrature({ user }) {
     try {
       const pos = await getPosition()
       setPhase('')
-      await createClocking({ employeeId: user.id, kind, ...(pos || {}) })
+      const saved = await createClocking({ employeeId: user.id, kind, ...(pos || {}) })
+      // Cross-check GPS↔IP (best-effort) solo per timbrature online con posizione.
+      if (saved && !saved.pending && saved.lat != null) requestIpCheck(saved)
       await refresh()
     } catch (err) {
       setError(err.message || 'Timbratura non riuscita.')

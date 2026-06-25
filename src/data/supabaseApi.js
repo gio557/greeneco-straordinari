@@ -477,6 +477,9 @@ function rowToClocking(c) {
     receivedAt: c.received_at,
     offline: c.offline,
     clockSkewSeconds: c.clock_skew_seconds,
+    ipCountry: c.ip_country,
+    ipDistanceKm: c.ip_distance_km,
+    ipMismatch: c.ip_mismatch,
   }
 }
 
