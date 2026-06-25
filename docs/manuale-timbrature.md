@@ -7,7 +7,7 @@ in vista di un accordo sindacale e dell'eventuale adozione dello strumento.
 
 | | |
 |---|---|
-| **Versione documento** | 0.4 — bozza preliminare (modello viaggio/lavoro/pausa, schermate, funzionamento offline) |
+| **Versione documento** | 0.5 — bozza preliminare (modello viaggio/lavoro/pausa, schermate, funzionamento offline, verifiche di attendibilità) |
 | **Data** | 25 giugno 2026 |
 | **Ambito** | Esclusivamente il modulo "Timbrature Presenze" |
 | **Stato dello strumento** | Prototipo dimostrativo (non ancora in esercizio con dati reali) |
@@ -221,17 +221,22 @@ mezzanotte è ripartito tra i due giorni). Per ciascun giorno:
 > **Da definire con il Consulente:** se il calcolo dello straordinario debba avvenire su base
 > **giornaliera** (come oggi) o **settimanale/contrattuale**; il trattamento di festivi, notturni,
 > permessi e assenze; la **qualificazione e remunerazione delle ore di viaggio** secondo il CCNL
-> applicato. Lo strumento espone un dato **di supporto**, non un cartellino con valore legale (v. § 8).
+> applicato. Lo strumento espone un dato **di supporto**, non un cartellino con valore legale (v. § 10).
 
 ---
 
 ## 7. Gestione delle anomalie
 
-Il sistema **segnala** ma non "indovina" le situazioni irregolari, per non alterare i dati:
+Il sistema **segnala** ma non "indovina" le situazioni irregolari, per non alterare i dati.
+Nel cartellino possono comparire note come:
 
-- **"manca uscita"** — una nuova entrata senza che la precedente sia stata chiusa;
-- **"manca entrata"** — un'uscita senza entrata corrispondente;
-- **"ancora in servizio"** — entrata non ancora chiusa da un'uscita.
+- **"in servizio"** — l'ultima attività non è ancora stata chiusa (giornata in corso,
+  oppure non chiusa con "Fine giornata");
+- **"manca Fine giornata"** — un segmento che attraversa la mezzanotte senza una
+  timbratura di chiusura.
+
+A queste si aggiungono le **segnalazioni di verifica** (posizione, orario,
+sincronizzazione) descritte al § 9.
 
 > **Da definire:** la procedura di **rettifica/giustificazione** delle anomalie (chi può correggere,
 > con quale tracciabilità delle modifiche), aspetto rilevante sia ai fini gestionali sia di garanzia
@@ -280,7 +285,70 @@ contrassegnate "da inviare"; partiranno da sole al ritorno della connessione.*
 
 ---
 
-## 9. Stato attuale dello strumento e percorso verso la produzione
+## 9. Attendibilità delle timbrature e segnalazioni di verifica
+
+Lo strumento adotta alcune misure per garantire l'**attendibilità del dato** e per
+rendere **evidenti e verificabili** le situazioni dubbie. Le misure **non bloccano**
+il lavoratore: producono **segnalazioni** che il manager/amministratore può
+controllare.
+
+**Integrità dell'orario.**
+
+- Con connessione attiva, l'orario ufficiale della timbratura è quello del
+  **server**, non quello del telefono: regolare diversamente l'orologio del
+  dispositivo **non incide** sull'orario registrato.
+- Senza connessione, si conserva l'orario indicato dal telefono (unico
+  disponibile), ma la timbratura resta **marcata** e si registra lo **scarto**
+  rispetto all'orario di arrivo al server.
+
+**Posizione.** Rilevata solo al momento del tocco (v. § 5), in due passaggi:
+prima la posizione **precisa** (GPS); se non disponibile, una posizione
+**approssimata** (rete cellulare / Wi-Fi) anziché nessuna posizione. Viene sempre
+registrato il **raggio di precisione**.
+
+**Tracce raccolte per ogni timbratura** (a supporto delle verifiche): orario del
+dispositivo, orario di arrivo al server, presenza/assenza di connessione al
+momento, scarto d'orario, posizione e relativa precisione.
+
+**Segnalazioni "da verificare"** mostrate al manager nella vista in tempo reale
+(colonna *Verifica*, con filtro "solo da verificare" e conteggio):
+
+- *senza posizione* — timbratura registrata senza coordinate;
+- *posizione imprecisa* — raggio molto ampio (tipico con GPS disattivato);
+- *orologio sfasato* — orario del dispositivo distante da quello del server;
+- *offline · ritardo* — timbratura salvata sul dispositivo e sincronizzata molto
+  dopo (indicazione informativa, non necessariamente critica).
+
+Le stesse segnalazioni confluiscono nelle **Note del cartellino** e nel **CSV**.
+
+![Vista in tempo reale con la colonna Verifica](img/board-verifica.png)
+*Le segnalazioni sono evidenziate nella colonna "Verifica"; le righe da
+controllare sono messe in risalto e contate nella scheda "Da verificare".*
+
+> **Verifica posizione ↔ rete (opzionale).** È predisposto, ma **disattivato**, un
+> confronto tra la posizione e la collocazione approssimata dell'indirizzo di
+> rete (IP). Va valutato col Consulente prima di un'eventuale attivazione, perché
+> più incisivo sul piano del controllo.
+
+**Limiti dichiarati con trasparenza.** L'applicazione gira nel browser del
+telefono del dipendente e **non può controllarne il dispositivo in modo
+assoluto**: in particolare, da web non è possibile riconoscere una posizione GPS
+**simulata**. Se il lavoratore **non concede il permesso di localizzazione**, la
+posizione non è disponibile e la timbratura resta segnalata "senza posizione".
+Per garanzie più solide sul dispositivo servirebbe un'app **dedicata (nativa)** o
+un **terminale di timbratura in sede**. Le misure descritte mirano quindi a
+rendere le situazioni dubbie **difficili da nascondere e tracciabili**, più che a
+impedirle in assoluto.
+
+> **Profilo normativo.** Questi trattamenti possono configurare controlli a
+> distanza: vanno improntati a **proporzionalità**, preceduti da **informativa**
+> e, ove ricorra, da **accordo sindacale o autorizzazione dell'ITL** (art. 4
+> L. 300/1970), oltre alle basi del GDPR. Le misure più incisive (es. confronto
+> con l'indirizzo di rete) vanno attivate solo previa valutazione.
+
+---
+
+## 10. Stato attuale dello strumento e percorso verso la produzione
 
 Per correttezza verso il Consulente si dichiara con trasparenza lo **stato di avanzamento**.
 
@@ -292,7 +360,7 @@ reali del personale** in produzione. In particolare:
 - le regole di **isolamento dei dati a livello di database** (per cui ciascuno acceda solo ai dati di
   propria competenza) **non sono ancora applicate in modo forte**;
 - l'**informativa** mostrata è un **segnaposto** (Allegato A) da sostituire con il testo validato;
-- il meccanismo attuale di "consenso" all'avvio **è da rivedere** (v. nota nel § 9).
+- il meccanismo attuale di "consenso" all'avvio **è da rivedere** (v. § 11 sulla base giuridica).
 
 **Requisiti tecnici per l'esercizio (roadmap):**
 
@@ -316,7 +384,7 @@ reali del personale** in produzione. In particolare:
 
 ---
 
-## 10. Quadro normativo di riferimento (per la valutazione)
+## 11. Quadro normativo di riferimento (per la valutazione)
 
 Si elencano, a titolo ricognitivo e non esaustivo, le fonti rilevanti che il Consulente vorrà
 considerare:
