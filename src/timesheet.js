@@ -19,6 +19,8 @@
 // segnalate ma non "indovinate".
 // ---------------------------------------------------------------------------
 
+import { clockingChecks } from './clockingFlags.js'
+
 const MS_PER_HOUR = 3600000
 
 const WEEKDAY_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'short' })
@@ -135,6 +137,18 @@ export function buildEmployeeTimesheet(clockings, year, month0, thresholdHours) 
       if (!endByDay[k] || c.punchedAt > endByDay[k]) endByDay[k] = c.punchedAt
     }
   }
+
+  // Anomalie anti-frode del giorno (Livello 1): confluiscono nelle Note, quindi
+  // sono visibili nel cartellino e nel CSV. Solo i controlli "da verificare".
+  const verifyByDay = {}
+  for (const c of sorted) {
+    for (const x of clockingChecks(c)) {
+      if (x.level !== 'warn') continue
+      const k = localDateKey(c.punchedAt)
+      ;(verifyByDay[k] = verifyByDay[k] || new Set()).add(x.label)
+    }
+  }
+  for (const k in verifyByDay) addNote(k, `⚠ verifica: ${[...verifyByDay[k]].join(', ')}`)
 
   const daysInMonth = new Date(year, month0 + 1, 0).getDate()
   const rows = []

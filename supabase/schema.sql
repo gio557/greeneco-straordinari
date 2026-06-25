@@ -536,6 +536,15 @@ create table if not exists public.time_clockings (
   lat         double precision,
   lng         double precision,
   accuracy    double precision,
+  -- Anti-frode (Livello 1): tracce per la verifica.
+  --   device_time        = orario DICHIARATO dal dispositivo (manomettibile)
+  --   received_at        = orario in cui il server ha registrato la riga (autoritativo)
+  --   offline            = creata offline e sincronizzata in un secondo momento
+  --   clock_skew_seconds = scarto device_time - server (secondi); grande = sospetto
+  device_time        timestamptz,
+  received_at        timestamptz not null default now(),
+  offline            boolean not null default false,
+  clock_skew_seconds integer,
   created_at  timestamptz not null default now()
 );
 
@@ -545,6 +554,41 @@ create index if not exists time_clockings_employee_idx on public.time_clockings 
 alter table public.time_clockings drop constraint if exists time_clockings_kind_check;
 alter table public.time_clockings add constraint time_clockings_kind_check
   check (kind in ('travel', 'work', 'break', 'end', 'in', 'out'));
+
+-- Colonne anti-frode anche sulle installazioni già esistenti (idempotente).
+alter table public.time_clockings add column if not exists device_time        timestamptz;
+alter table public.time_clockings add column if not exists received_at        timestamptz not null default now();
+alter table public.time_clockings add column if not exists offline            boolean not null default false;
+alter table public.time_clockings add column if not exists clock_skew_seconds integer;
+
+-- Integrità dell'orario: il SERVER è la fonte di verità.
+--   • timbratura ONLINE  → punched_at = now() del server (l'orario inviato dal
+--     dispositivo viene ignorato: così cambiare l'orologio del telefono non ha
+--     effetto sulle timbrature fatte con rete).
+--   • timbratura OFFLINE → si conserva l'orario dichiarato dal dispositivo
+--     (unico disponibile), ma resta marcata `offline` e si registra lo scarto.
+create or replace function public.time_clockings_stamp()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.received_at := now();
+  if coalesce(new.offline, false) = false then
+    new.punched_at := now();
+  else
+    new.punched_at := coalesce(new.punched_at, new.device_time, now());
+  end if;
+  if new.device_time is not null then
+    new.clock_skew_seconds := round(extract(epoch from (new.device_time - new.received_at)));
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_time_clockings_stamp on public.time_clockings;
+create trigger trg_time_clockings_stamp
+  before insert on public.time_clockings
+  for each row execute function public.time_clockings_stamp();
 
 alter table public.time_clockings enable row level security;
 

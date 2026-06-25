@@ -418,14 +418,20 @@ export async function getClockingsInRange(fromISO, toISO) {
 export async function createClocking({ employeeId, kind, lat, lng, accuracy }) {
   await delay()
   const state = load()
+  const nowIso = new Date().toISOString()
   const clocking = {
     id: `clk-${Date.now()}`,
     employeeId,
     kind,
-    punchedAt: new Date().toISOString(),
+    punchedAt: nowIso,
     lat: lat ?? null,
     lng: lng ?? null,
     accuracy: accuracy ?? null,
+    // Campi anti-frode: in demo tutto è locale e coerente (nessuna anomalia).
+    deviceTime: nowIso,
+    receivedAt: nowIso,
+    offline: false,
+    clockSkewSeconds: 0,
   }
   state.clockings = state.clockings || []
   state.clockings.push(clocking)

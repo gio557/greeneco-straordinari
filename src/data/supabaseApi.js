@@ -473,6 +473,10 @@ function rowToClocking(c) {
     lat: c.lat,
     lng: c.lng,
     accuracy: c.accuracy,
+    deviceTime: c.device_time,
+    receivedAt: c.received_at,
+    offline: c.offline,
+    clockSkewSeconds: c.clock_skew_seconds,
   }
 }
 
@@ -523,10 +527,11 @@ export async function getClockingsInRange(fromISO, toISO) {
   return data.map(rowToClocking)
 }
 
-export async function createClocking({ employeeId, kind, lat, lng, accuracy, id, punchedAt }) {
-  // `id` e `punchedAt` possono arrivare dal dispositivo (buffer offline): in tal
-  // caso si usa l'upsert per essere idempotenti — un reinvio della stessa
-  // timbratura non crea righe duplicate.
+// Costruisce la riga da inserire. `withFraud` include le colonne anti-frode
+// (presenti solo dopo la migrazione dello schema). In entrambi i casi, per le
+// timbrature ONLINE non si invia `punched_at`: lo imposta il server (default
+// now() o trigger), così l'orologio del telefono non incide.
+function buildClockingRow({ employeeId, kind, lat, lng, accuracy, id, punchedAt, deviceTime, offline }, withFraud) {
   const row = {
     id: id || `clk-${Date.now()}`,
     employee_id: employeeId,
@@ -535,14 +540,45 @@ export async function createClocking({ employeeId, kind, lat, lng, accuracy, id,
     lng: lng ?? null,
     accuracy: accuracy ?? null,
   }
-  if (punchedAt) row.punched_at = punchedAt
-  const { data, error } = await supabase
+  if (withFraud) {
+    row.device_time = deviceTime ?? punchedAt ?? null
+    row.offline = !!offline
+  }
+  if (offline && (punchedAt || deviceTime)) row.punched_at = punchedAt ?? deviceTime
+  return row
+}
+
+// Riconosce l'errore "le colonne anti-frode non esistono ancora" (migrazione
+// dello schema non ancora eseguita), per ripiegare su un inserimento legacy.
+function isMissingFraudColumns(message) {
+  const m = String(message || '').toLowerCase()
+  return (
+    m.includes('device_time') ||
+    m.includes('received_at') ||
+    m.includes('clock_skew') ||
+    (m.includes('offline') && m.includes('column')) ||
+    m.includes('schema cache')
+  )
+}
+
+export async function createClocking(payload) {
+  // `id` arriva dal dispositivo: l'upsert rende il reinvio idempotente.
+  let res = await supabase
     .from('time_clockings')
-    .upsert(row, { onConflict: 'id' })
+    .upsert(buildClockingRow(payload, true), { onConflict: 'id' })
     .select()
     .single()
-  if (error) throw new Error(error.message)
-  return rowToClocking(data)
+  // Compatibilità: se lo schema anti-frode non è ancora stato applicato, ripiega
+  // su un inserimento senza i nuovi campi (le timbrature continuano a funzionare).
+  if (res.error && isMissingFraudColumns(res.error.message)) {
+    res = await supabase
+      .from('time_clockings')
+      .upsert(buildClockingRow(payload, false), { onConflict: 'id' })
+      .select()
+      .single()
+  }
+  if (res.error) throw new Error(res.error.message)
+  return rowToClocking(res.data)
 }
 
 export function subscribeToClockings(onChange) {

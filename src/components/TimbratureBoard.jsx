@@ -3,6 +3,7 @@ import { getRecentClockings, getUserMap, subscribeToClockings } from '../data/ap
 import { useLiveData } from '../data/useLiveData.js'
 import { formatDateTime } from '../utils.js'
 import { normalizeKind, ACTIVITIES } from '../timesheet.js'
+import { clockingChecks, isToVerify } from '../clockingFlags.js'
 import MonthlyTimesheet from './MonthlyTimesheet.jsx'
 
 const STATE_LABEL = { travel: 'In viaggio', work: 'Al lavoro', break: 'In pausa' }
@@ -16,6 +17,7 @@ export default function TimbratureBoard({ user }) {
   const [clockings, setClockings] = useState([])
   const [userMap, setUserMap] = useState({})
   const [loading, setLoading] = useState(true)
+  const [onlyToVerify, setOnlyToVerify] = useState(false)
 
   async function refresh(showSpinner = false) {
     if (showSpinner) setLoading(true)
@@ -50,6 +52,10 @@ export default function TimbratureBoard({ user }) {
     return visible.filter((c) => (c.punchedAt || '').slice(0, 10) === today).length
   }, [visible])
 
+  // Timbrature che richiedono una verifica (senza posizione, orologio sfasato…).
+  const toVerify = useMemo(() => visible.filter(isToVerify), [visible])
+  const rows = onlyToVerify ? toVerify : visible
+
   const name = (id) => userMap[id]?.name ?? id ?? '—'
 
   return (
@@ -76,6 +82,7 @@ export default function TimbratureBoard({ user }) {
         <div className="stat-grid">
           <StatCard label="In servizio ora" value={inService.length} accent={inService.length ? 'approved' : undefined} />
           <StatCard label="Timbrature oggi" value={todayCount} />
+          <StatCard label="Da verificare" value={toVerify.length} accent={toVerify.length ? 'warn' : undefined} />
         </div>
 
         <h3 className="mini-title">In servizio adesso</h3>
@@ -98,22 +105,33 @@ export default function TimbratureBoard({ user }) {
           </div>
         )}
 
-        <h3 className="mini-title">Timbrature recenti</h3>
+        <div className="dash-list-head">
+          <h3 className="mini-title">Timbrature recenti</h3>
+          <label className="verify-filter">
+            <input
+              type="checkbox"
+              checked={onlyToVerify}
+              onChange={(e) => setOnlyToVerify(e.target.checked)}
+            />
+            Solo da verificare
+          </label>
+        </div>
         {loading ? (
           <p className="muted center">Caricamento…</p>
-        ) : visible.length === 0 ? (
-          <div className="empty"><p>Nessuna timbratura.</p></div>
+        ) : rows.length === 0 ? (
+          <div className="empty"><p>{onlyToVerify ? 'Nessuna timbratura da verificare.' : 'Nessuna timbratura.'}</p></div>
         ) : (
           <div className="table-wrap">
             <table className="dash-table">
               <thead>
-                <tr><th>Dipendente</th><th>Attività</th><th>Quando</th><th>Posizione</th></tr>
+                <tr><th>Dipendente</th><th>Attività</th><th>Quando</th><th>Posizione</th><th>Verifica</th></tr>
               </thead>
               <tbody>
-                {visible.slice(0, 100).map((c) => {
+                {rows.slice(0, 100).map((c) => {
                   const act = normalizeKind(c.kind)
+                  const checks = clockingChecks(c)
                   return (
-                  <tr key={c.id}>
+                  <tr key={c.id} className={isToVerify(c) ? 'row-verify' : undefined}>
                     <td data-label="Dipendente">{name(c.employeeId)}</td>
                     <td data-label="Attività">
                       <span className={`badge clock-badge ${act}`}>{ACTIVITIES[act]?.label ?? act}</span>
@@ -123,6 +141,15 @@ export default function TimbratureBoard({ user }) {
                       {c.lat != null ? (
                         <a href={`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer">📍 mappa</a>
                       ) : '—'}
+                    </td>
+                    <td data-label="Verifica">
+                      {checks.length === 0 ? (
+                        <span className="muted">✓</span>
+                      ) : (
+                        checks.map((x) => (
+                          <span key={x.code} className={`verify-chip verify-${x.level}`}>{x.label}</span>
+                        ))
+                      )}
                     </td>
                   </tr>
                   )

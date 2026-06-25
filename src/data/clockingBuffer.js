@@ -134,7 +134,7 @@ export function makeResilientClockings(remote, options = {}) {
     try {
       for (const item of pending) {
         try {
-          const saved = await remote.createClocking(item)
+          const saved = await remote.createClocking({ ...item, offline: true })
           dequeue(item.id)
           mergeMirror([saved])
         } catch {
@@ -160,7 +160,7 @@ export function makeResilientClockings(remote, options = {}) {
     }
     if (!isOffline()) {
       try {
-        const saved = await remote.createClocking(item)
+        const saved = await remote.createClocking({ ...item, offline: false })
         mergeMirror([saved])
         flushOutbox()
         return saved
@@ -169,8 +169,8 @@ export function makeResilientClockings(remote, options = {}) {
       }
     }
     enqueue(item)
-    mergeMirror([item])
-    return { ...item, pending: true }
+    mergeMirror([{ ...item, offline: true }])
+    return { ...item, offline: true, pending: true }
   }
 
   async function getLastClocking(employeeId) {
