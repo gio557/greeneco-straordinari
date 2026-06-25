@@ -7,7 +7,7 @@ in vista di un accordo sindacale e dell'eventuale adozione dello strumento.
 
 | | |
 |---|---|
-| **Versione documento** | 0.3 — bozza preliminare (modello viaggio/lavoro/pausa, con schermate) |
+| **Versione documento** | 0.4 — bozza preliminare (modello viaggio/lavoro/pausa, schermate, funzionamento offline) |
 | **Data** | 25 giugno 2026 |
 | **Ambito** | Esclusivamente il modulo "Timbrature Presenze" |
 | **Stato dello strumento** | Prototipo dimostrativo (non ancora in esercizio con dati reali) |
@@ -80,8 +80,8 @@ Le attività previste sono:
 **Flusso operativo:**
 
 1. Il dipendente accede e apre la sezione **"Timbrature Presenze"**.
-2. **Alla prima timbratura** viene mostrata un'**informativa** da leggere prima di procedere (v. § 9 —
-   Allegato A: la versione attuale è un **segnaposto** da sostituire con il testo validato).
+2. **Alla prima timbratura** viene mostrata un'**informativa** da leggere prima di procedere
+   (v. Allegato A: la versione attuale è un **segnaposto** da sostituire con il testo validato).
 3. La schermata mostra lo **stato corrente** ("Fuori servizio" / "In viaggio" / "Al lavoro" / "In
    pausa") e i soli pulsanti pertinenti, ad esempio: da *Al lavoro* sono disponibili `Inizio pausa`,
    `Inizio viaggio`, `Fine giornata`.
@@ -239,7 +239,48 @@ Il sistema **segnala** ma non "indovina" le situazioni irregolari, per non alter
 
 ---
 
-## 8. Stato attuale dello strumento e percorso verso la produzione
+## 8. Continuità senza connessione (buffer di sicurezza)
+
+Lo strumento è pensato per essere usato anche dove la rete è debole o assente
+(seminterrati, impianti, zone senza copertura). Per questo adotta più livelli di
+sicurezza contro la perdita di dati:
+
+- **Apertura offline.** L'app è una *web-app installabile*: il suo "guscio" resta
+  in memoria sul dispositivo, quindi **si apre anche senza connessione**.
+- **Memoria locale degli ultimi 7 giorni (lettura).** Le timbrature recenti
+  restano salvate sul dispositivo: se il database non è raggiungibile, il
+  dipendente vede comunque lo storico recente e l'app conosce lo **stato
+  corrente** (quindi propone i pulsanti giusti).
+- **Coda di invio (scrittura).** Una timbratura che non raggiunge il database
+  viene **salvata sul dispositivo e confermata subito** al dipendente, poi
+  **reinviata automaticamente** appena torna la connessione (o alla riapertura
+  dell'app). **Nessuna timbratura viene persa.**
+
+Garanzie tecniche rilevanti ai fini della valutazione:
+
+- l'orario registrato è quello **del momento della timbratura** (il tocco), non
+  quello del successivo invio al database;
+- l'invio è **idempotente**: un reinvio non crea timbrature duplicate;
+- il dispositivo mostra in modo evidente quante timbrature sono **in attesa di
+  invio** (avviso nell'intestazione, sempre visibile, e indicazione "da inviare"
+  accanto alle singole righe).
+
+![Timbrature salvate sul dispositivo in attesa di invio](img/stato-offline.png)
+*Esempio: due timbrature effettuate senza rete sono salvate sul dispositivo e
+contrassegnate "da inviare"; partiranno da sole al ritorno della connessione.*
+
+> **Nota per il manager.** Le timbrature non ancora sincronizzate, per loro
+> natura, non sono ancora sul server: compaiono nel riepilogo centrale (e quindi
+> al manager) **non appena il dispositivo torna online**, già con l'orario reale
+> della timbratura. Eventuali limiti: i dati del buffer restano sul dispositivo
+> (in chiaro) e riguardano solo gli ultimi 7 giorni; il rilevamento automatico
+> dell'assenza di rete può non riconoscere alcune reti "captive" (Wi-Fi che
+> sembra attivo ma non naviga), nel qual caso la timbratura viene comunque
+> messa in coda dopo il tentativo fallito.
+
+---
+
+## 9. Stato attuale dello strumento e percorso verso la produzione
 
 Per correttezza verso il Consulente si dichiara con trasparenza lo **stato di avanzamento**.
 
@@ -275,7 +316,7 @@ reali del personale** in produzione. In particolare:
 
 ---
 
-## 9. Quadro normativo di riferimento (per la valutazione)
+## 10. Quadro normativo di riferimento (per la valutazione)
 
 Si elencano, a titolo ricognitivo e non esaustivo, le fonti rilevanti che il Consulente vorrà
 considerare:
