@@ -11,8 +11,17 @@
 // telefono è considerato "sfasato" (possibile manomissione o device mal regolato).
 export const SKEW_LIMIT_S = 300 // 5 minuti
 
+// Oltre questo raggio di precisione, il fix è considerato "approssimativo"
+// (tipico di posizione da sole celle/WiFi, es. GPS spento). È una segnalazione
+// morbida: anche al chiuso il fix può essere grossolano.
+export const ACCURACY_LIMIT_M = 500
+
 // Ritardo di sincronizzazione oltre il quale una timbratura offline è "in ritardo".
 export const OFFLINE_DELAY_LIMIT_S = 2 * 3600 // 2 ore
+
+function formatMeters(m) {
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`
+}
 
 // Ritorna l'elenco dei controlli rilevanti per la timbratura.
 // Ogni voce: { code, label, level } con level 'warn' (da verificare) o 'info'.
@@ -22,11 +31,22 @@ export function clockingChecks(c) {
 
   if (c.lat == null) {
     checks.push({ code: 'no-gps', label: 'senza posizione', level: 'warn' })
+  } else if (c.accuracy != null && c.accuracy > ACCURACY_LIMIT_M) {
+    checks.push({ code: 'low-accuracy', label: `posizione imprecisa (~${formatMeters(c.accuracy)})`, level: 'warn' })
   }
 
   if (c.clockSkewSeconds != null && Math.abs(c.clockSkewSeconds) > SKEW_LIMIT_S) {
     const min = Math.round(c.clockSkewSeconds / 60)
     checks.push({ code: 'skew', label: `orologio ${min > 0 ? '+' : ''}${min} min`, level: 'warn' })
+  }
+
+  // Cross-check posizione GPS ↔ IP (Livello 3, popolato dalla edge function).
+  if (c.ipMismatch) {
+    checks.push({
+      code: 'ip',
+      label: c.ipDistanceKm != null ? `GPS≠IP (~${c.ipDistanceKm} km)` : 'GPS≠IP',
+      level: 'warn',
+    })
   }
 
   if (c.offline) {

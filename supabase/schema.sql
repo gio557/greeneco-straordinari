@@ -545,6 +545,11 @@ create table if not exists public.time_clockings (
   received_at        timestamptz not null default now(),
   offline            boolean not null default false,
   clock_skew_seconds integer,
+  -- Cross-check posizione GPS ↔ IP (Livello 3): popolato dalla edge function
+  -- `clocking-ip-check`, se attivata. Resta null se la funzione non è in uso.
+  ip_country         text,
+  ip_distance_km     integer,
+  ip_mismatch        boolean,
   created_at  timestamptz not null default now()
 );
 
@@ -560,6 +565,9 @@ alter table public.time_clockings add column if not exists device_time        ti
 alter table public.time_clockings add column if not exists received_at        timestamptz not null default now();
 alter table public.time_clockings add column if not exists offline            boolean not null default false;
 alter table public.time_clockings add column if not exists clock_skew_seconds integer;
+alter table public.time_clockings add column if not exists ip_country         text;
+alter table public.time_clockings add column if not exists ip_distance_km     integer;
+alter table public.time_clockings add column if not exists ip_mismatch        boolean;
 
 -- Integrità dell'orario: il SERVER è la fonte di verità.
 --   • timbratura ONLINE  → punched_at = now() del server (l'orario inviato dal
