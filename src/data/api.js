@@ -16,8 +16,14 @@
 import { supabaseConfigured } from './supabaseClient.js'
 import * as local from './localApi.js'
 import * as remote from './supabaseApi.js'
+import { makeResilientClockings } from './clockingBuffer.js'
 
 const impl = supabaseConfigured ? remote : local
+
+// In modalità Supabase le timbrature passano dal livello "resiliente" (mirror
+// locale a 7 giorni + coda di scrittura offline). In modalità demo i dati sono
+// già tutti locali, quindi si usa direttamente l'implementazione demo.
+const clk = supabaseConfigured ? makeResilientClockings(remote) : local
 
 // 'supabase' = database centrale condiviso · 'demo' = dati locali sul telefono.
 export const dataMode = supabaseConfigured ? 'supabase' : 'demo'
@@ -54,10 +60,12 @@ export const adminUpsertVehicle = impl.adminUpsertVehicle
 export const adminDeleteVehicle = impl.adminDeleteVehicle
 export const subscribeToVehicleData = impl.subscribeToVehicleData
 
-// Timbrature presenze
-export const getLastClocking = impl.getLastClocking
-export const getMyClockings = impl.getMyClockings
-export const getRecentClockings = impl.getRecentClockings
-export const getClockingsInRange = impl.getClockingsInRange
-export const createClocking = impl.createClocking
-export const subscribeToClockings = impl.subscribeToClockings
+// Timbrature presenze (con buffer di sicurezza in modalità Supabase)
+export const getLastClocking = clk.getLastClocking
+export const getMyClockings = clk.getMyClockings
+export const getRecentClockings = clk.getRecentClockings
+export const getClockingsInRange = clk.getClockingsInRange
+export const createClocking = clk.createClocking
+export const subscribeToClockings = clk.subscribeToClockings
+// Numero di timbrature in attesa di invio (0 in modalità demo).
+export const pendingClockings = clk.pendingCount || (() => 0)

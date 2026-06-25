@@ -94,6 +94,7 @@ export default function Timbrature({ user }) {
 
   const state = currentState(last)
   const actions = ACTIONS[state]
+  const pendingCount = mine.filter((c) => c.pending).length
 
   async function punch(kind) {
     setBusy(true)
@@ -148,6 +149,13 @@ export default function Timbrature({ user }) {
 
       <p className="muted small center clock-hint">{STATE_HINT[state]}</p>
 
+      {pendingCount > 0 && (
+        <p className="clock-pending-banner">
+          ⏳ {pendingCount === 1 ? '1 timbratura salvata' : `${pendingCount} timbrature salvate`} sul dispositivo:
+          {pendingCount === 1 ? ' verrà inviata' : ' verranno inviate'} automaticamente appena torna la connessione.
+        </p>
+      )}
+
       <p className="muted center small" style={{ marginTop: 10 }}>
         📍 La posizione è rilevata solo ora, all'atto della timbratura.
         {' '}<button className="link-btn" onClick={() => setShowNotice(true)}>Informativa privacy</button>
@@ -168,7 +176,9 @@ export default function Timbrature({ user }) {
                   {ACTIVITY_ICON[act]} {ACTIVITIES[act]?.label ?? act}
                 </span>
                 <span className="clock-row-time">{formatDateTime(c.punchedAt)}</span>
-                {c.lat != null ? (
+                {c.pending ? (
+                  <span className="clock-pending">⏳ da inviare</span>
+                ) : c.lat != null ? (
                   <a className="clock-map" href={`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer">📍 mappa</a>
                 ) : (
                   <span className="muted small">senza posizione</span>

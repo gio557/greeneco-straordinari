@@ -1294,6 +1294,26 @@ code {
 
 .clock-actions { display: flex; flex-direction: column; gap: 10px; }
 .clock-hint { margin-top: 12px; line-height: 1.45; }
+.clock-pending-banner {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: var(--amber-bg);
+  color: var(--amber);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+}
+.clock-pending {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  background: var(--amber-bg);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
 .clock-btn { font-size: 18px; padding: 18px; }
 .clock-btn.work { background: var(--green); }
 .clock-btn.travel { background: #1f7a8c; }

@@ -523,17 +523,22 @@ export async function getClockingsInRange(fromISO, toISO) {
   return data.map(rowToClocking)
 }
 
-export async function createClocking({ employeeId, kind, lat, lng, accuracy }) {
+export async function createClocking({ employeeId, kind, lat, lng, accuracy, id, punchedAt }) {
+  // `id` e `punchedAt` possono arrivare dal dispositivo (buffer offline): in tal
+  // caso si usa l'upsert per essere idempotenti — un reinvio della stessa
+  // timbratura non crea righe duplicate.
+  const row = {
+    id: id || `clk-${Date.now()}`,
+    employee_id: employeeId,
+    kind,
+    lat: lat ?? null,
+    lng: lng ?? null,
+    accuracy: accuracy ?? null,
+  }
+  if (punchedAt) row.punched_at = punchedAt
   const { data, error } = await supabase
     .from('time_clockings')
-    .insert({
-      id: `clk-${Date.now()}`,
-      employee_id: employeeId,
-      kind,
-      lat: lat ?? null,
-      lng: lng ?? null,
-      accuracy: accuracy ?? null,
-    })
+    .upsert(row, { onConflict: 'id' })
     .select()
     .single()
   if (error) throw new Error(error.message)
