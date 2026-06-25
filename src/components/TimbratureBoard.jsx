@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react'
 import { getRecentClockings, getUserMap, subscribeToClockings } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { formatDateTime } from '../utils.js'
+import { normalizeKind, ACTIVITIES } from '../timesheet.js'
 import MonthlyTimesheet from './MonthlyTimesheet.jsx'
+
+const STATE_LABEL = { travel: 'In viaggio', work: 'Al lavoro', break: 'In pausa' }
 
 // Vista presenze per manager/admin. Il manager vede il proprio team, l'admin
 // tutti. (Su impianto prototipo il filtro è applicativo; con auth reale + RLS
@@ -36,8 +39,9 @@ export default function TimbratureBoard({ user }) {
     return m
   }, [visible])
 
+  // "In servizio" = chi ha un'attività aperta (ultima timbratura diversa da Fine).
   const inService = useMemo(
-    () => Object.values(lastByEmp).filter((c) => c.kind === 'in'),
+    () => Object.values(lastByEmp).filter((c) => normalizeKind(c.kind) !== 'end'),
     [lastByEmp]
   )
 
@@ -79,15 +83,18 @@ export default function TimbratureBoard({ user }) {
           <p className="muted small">Nessuno risulta attualmente in servizio.</p>
         ) : (
           <div className="list">
-            {inService.map((c) => (
-              <div key={c.employeeId} className="card clock-row">
-                <span className="badge badge-approved">In servizio</span>
-                <span className="clock-row-time"><strong>{name(c.employeeId)}</strong> · dalle {formatDateTime(c.punchedAt)}</span>
-                {c.lat != null && (
-                  <a className="clock-map" href={`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer">📍 mappa</a>
-                )}
-              </div>
-            ))}
+            {inService.map((c) => {
+              const act = normalizeKind(c.kind)
+              return (
+                <div key={c.employeeId} className="card clock-row">
+                  <span className={`badge clock-badge ${act}`}>{STATE_LABEL[act] ?? act}</span>
+                  <span className="clock-row-time"><strong>{name(c.employeeId)}</strong> · dalle {formatDateTime(c.punchedAt)}</span>
+                  {c.lat != null && (
+                    <a className="clock-map" href={`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer">📍 mappa</a>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -100,16 +107,16 @@ export default function TimbratureBoard({ user }) {
           <div className="table-wrap">
             <table className="dash-table">
               <thead>
-                <tr><th>Dipendente</th><th>Tipo</th><th>Quando</th><th>Posizione</th></tr>
+                <tr><th>Dipendente</th><th>Attività</th><th>Quando</th><th>Posizione</th></tr>
               </thead>
               <tbody>
-                {visible.slice(0, 100).map((c) => (
+                {visible.slice(0, 100).map((c) => {
+                  const act = normalizeKind(c.kind)
+                  return (
                   <tr key={c.id}>
                     <td data-label="Dipendente">{name(c.employeeId)}</td>
-                    <td data-label="Tipo">
-                      <span className={`badge ${c.kind === 'in' ? 'badge-approved' : 'badge-rejected'}`}>
-                        {c.kind === 'in' ? 'Entrata' : 'Uscita'}
-                      </span>
+                    <td data-label="Attività">
+                      <span className={`badge clock-badge ${act}`}>{ACTIVITIES[act]?.label ?? act}</span>
                     </td>
                     <td data-label="Quando">{formatDateTime(c.punchedAt)}</td>
                     <td data-label="Posizione">
@@ -118,7 +125,8 @@ export default function TimbratureBoard({ user }) {
                       ) : '—'}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
