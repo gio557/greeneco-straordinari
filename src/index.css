@@ -1285,14 +1285,25 @@ code {
   border-radius: var(--radius);
   margin-bottom: 14px;
 }
-.clock-status.in { background: var(--green-bg); color: var(--green); }
-.clock-status.out { background: var(--bg); color: var(--muted); }
+.clock-status.work { background: var(--green-bg); color: var(--green); }
+.clock-status.travel { background: #e6f0f4; color: #1f7a8c; }
+.clock-status.break { background: #fdf0e0; color: #b7791f; }
+.clock-status.off { background: var(--bg); color: var(--muted); }
 .clock-status .clock-since { font-weight: 500; }
 .clock-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
 
-.clock-btn { font-size: 18px; padding: 20px; }
-.clock-btn.in { background: var(--green); }
-.clock-btn.out { background: var(--red); }
+.clock-actions { display: flex; flex-direction: column; gap: 10px; }
+.clock-btn { font-size: 18px; padding: 18px; }
+.clock-btn.work { background: var(--green); }
+.clock-btn.travel { background: #1f7a8c; }
+.clock-btn.break { background: #b7791f; }
+.clock-btn.end { background: var(--red); }
+
+/* Badge per attività (storico e board) */
+.clock-badge.work { background: var(--green-bg); color: var(--green); }
+.clock-badge.travel { background: #e6f0f4; color: #1f7a8c; }
+.clock-badge.break { background: #fdf0e0; color: #b7791f; }
+.clock-badge.end { background: var(--bg); color: var(--muted); }
 
 .link-btn {
   background: none;
@@ -1384,7 +1395,7 @@ code {
 }
 .ts-actions .btn-ghost:disabled { opacity: .5; }
 
-.ts-summary { grid-template-columns: repeat(3, 1fr); }
+.ts-summary { grid-template-columns: repeat(4, 1fr); }
 .ts-caption { margin: 0 0 12px; }
 
 .ts-table td.num,
@@ -1400,5 +1411,5 @@ code {
 @media (max-width: 640px) {
   .ts-actions { margin-left: 0; width: 100%; }
   .ts-actions .btn-ghost { flex: 1; }
-  .ts-summary { grid-template-columns: repeat(3, 1fr); }
+  .ts-summary { grid-template-columns: repeat(2, 1fr); }
 }

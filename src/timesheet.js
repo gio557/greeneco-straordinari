@@ -1,19 +1,21 @@
 // ---------------------------------------------------------------------------
-// Calcolo del cartellino mensile a partire dalle timbrature (entrate/uscite).
+// Calcolo del cartellino mensile a partire dalle timbrature.
 //
-// Logica e assunzioni (prototipo):
-//   • Le timbrature sono eventi 'in' (entrata) e 'out' (uscita). Vengono
-//     accoppiate in ordine cronologico: ogni 'in' si chiude con la 'out'
-//     successiva, formando un intervallo di lavoro.
-//   • Le ore di ciascun intervallo sono attribuite al giorno in cui sono state
-//     effettivamente svolte (fuso orario locale del browser); un turno che
-//     supera la mezzanotte viene ripartito tra i due giorni.
-//   • Per ogni giorno: ore ordinarie = min(lavorate, soglia giornaliera);
-//     straordinarie = max(0, lavorate − soglia). La soglia è impostabile.
-//   • I valori NON sono arrotondati a quarti/mezze/ore intere: sono il tempo
-//     effettivo (precisione al minuto nelle viste, esatto nel CSV).
+// Modello "dichiara attività": ogni timbratura indica l'attività che INIZIA in
+// quel momento e chiude la precedente. Tipi:
+//   • travel = viaggio (pagato, MAI straordinario)
+//   • work   = lavoro (ordinario fino alla soglia, poi straordinario)
+//   • break  = pausa (NON pagata, non conteggiata)
+//   • end    = fine giornata (chiude l'ultimo segmento, durata nulla)
+// ('in'/'out' storici sono mappati su work/end per compatibilità.)
 //
-// È una stima di supporto: anomalie come una entrata senza uscita vengono
+// Ogni intervallo tra due timbrature è un segmento dell'attività dichiarata
+// dalla prima; le ore sono attribuite al giorno in cui sono svolte (fuso orario
+// locale), ripartendo i segmenti che superano la mezzanotte. I valori NON sono
+// arrotondati: sono il tempo effettivo (precisione al minuto a video, esatto
+// nel CSV). Lo straordinario è calcolato SOLO sulle ore di lavoro.
+//
+// È una stima di supporto: le anomalie (giornata non chiusa, ecc.) sono
 // segnalate ma non "indovinate".
 // ---------------------------------------------------------------------------
 
@@ -22,6 +24,22 @@ const MS_PER_HOUR = 3600000
 const WEEKDAY_FMT = new Intl.DateTimeFormat('it-IT', { weekday: 'short' })
 const TIME_FMT = new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' })
 const MONTH_FMT = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' })
+
+// Tipi di attività e relative etichette.
+export const ACTIVITIES = {
+  travel: { label: 'Viaggio', short: 'Viaggio' },
+  work: { label: 'Lavoro', short: 'Lavoro' },
+  break: { label: 'Pausa', short: 'Pausa' },
+  end: { label: 'Fine giornata', short: 'Fine' },
+}
+
+// Mappa eventuali timbrature storiche 'in'/'out' sui nuovi tipi.
+export function normalizeKind(kind) {
+  if (kind === 'in') return 'work'
+  if (kind === 'out') return 'end'
+  if (kind === 'travel' || kind === 'work' || kind === 'break' || kind === 'end') return kind
+  return 'work'
+}
 
 // Chiave giorno YYYY-MM-DD nel fuso orario LOCALE (non UTC).
 export function localDateKey(value) {
@@ -55,29 +73,6 @@ export function hoursDecimal(hours) {
   return (hours || 0).toFixed(2).replace('.', ',')
 }
 
-// Accoppia gli eventi in intervalli [start, end] e raccoglie le anomalie.
-function pairIntervals(clockings) {
-  const sorted = [...clockings].sort((a, b) => a.punchedAt.localeCompare(b.punchedAt))
-  const intervals = []
-  const anomalies = []
-  let open = null
-  for (const c of sorted) {
-    if (c.kind === 'in') {
-      if (open) anomalies.push({ type: 'missing_out', at: open.punchedAt })
-      open = c
-    } else {
-      if (open) {
-        intervals.push({ start: open.punchedAt, end: c.punchedAt })
-        open = null
-      } else {
-        anomalies.push({ type: 'missing_in', at: c.punchedAt })
-      }
-    }
-  }
-  if (open) anomalies.push({ type: 'open', at: open.punchedAt })
-  return { intervals, anomalies }
-}
-
 // Ripartisce un intervallo tra i giorni locali che attraversa → { 'YYYY-MM-DD': ms }.
 function splitIntervalByDay(startMs, endMs) {
   const segs = {}
@@ -94,58 +89,72 @@ function splitIntervalByDay(startMs, endMs) {
   return segs
 }
 
-const NOTE_BY_TYPE = {
-  missing_out: 'manca uscita',
-  missing_in: 'manca entrata',
-  open: 'ancora in servizio',
-}
+const NOTE = { open: 'in servizio', unclosed: 'manca Fine giornata' }
 
 // Costruisce il cartellino di UN dipendente per il mese (year, month0 = 0–11).
-// `clockings` può coprire un intervallo più ampio: si filtra per giorno locale.
 export function buildEmployeeTimesheet(clockings, year, month0, thresholdHours) {
-  const { intervals, anomalies } = pairIntervals(clockings)
+  const sorted = [...clockings].sort((a, b) => a.punchedAt.localeCompare(b.punchedAt))
 
-  const workedMsByDay = {}
-  for (const iv of intervals) {
-    const s = Date.parse(iv.start)
-    const e = Date.parse(iv.end)
-    if (!(e > s)) continue
-    const segs = splitIntervalByDay(s, e)
-    for (const k in segs) workedMsByDay[k] = (workedMsByDay[k] || 0) + segs[k]
-  }
-
-  const firstInByDay = {}
-  const lastOutByDay = {}
-  for (const c of clockings) {
-    const k = localDateKey(c.punchedAt)
-    if (c.kind === 'in') {
-      if (!firstInByDay[k] || c.punchedAt < firstInByDay[k]) firstInByDay[k] = c.punchedAt
-    } else {
-      if (!lastOutByDay[k] || c.punchedAt > lastOutByDay[k]) lastOutByDay[k] = c.punchedAt
-    }
-  }
-
+  const byDay = {} // k -> { work, travel, break } in ms
   const notesByDay = {}
-  for (const a of anomalies) {
-    const k = localDateKey(a.at)
-    const note = NOTE_BY_TYPE[a.type]
-    if (!note) continue
+  const addNote = (k, n) => {
     notesByDay[k] = notesByDay[k] || []
-    if (!notesByDay[k].includes(note)) notesByDay[k].push(note)
+    if (!notesByDay[k].includes(n)) notesByDay[k].push(n)
+  }
+  const addMs = (k, act, ms) => {
+    const d = (byDay[k] = byDay[k] || { work: 0, travel: 0, break: 0 })
+    d[act] = (d[act] || 0) + ms
+  }
+
+  for (let i = 0; i < sorted.length; i++) {
+    const cur = sorted[i]
+    const act = normalizeKind(cur.kind)
+    if (act === 'end') continue // chiude soltanto: nessun segmento proprio
+    const next = sorted[i + 1]
+    if (!next) {
+      addNote(localDateKey(cur.punchedAt), NOTE.open) // segmento ancora aperto
+      continue
+    }
+    const s = Date.parse(cur.punchedAt)
+    const e = Date.parse(next.punchedAt)
+    if (!(e > s)) continue
+    if (localDateKey(cur.punchedAt) !== localDateKey(next.punchedAt)) {
+      addNote(localDateKey(cur.punchedAt), NOTE.unclosed) // attraversa la mezzanotte
+    }
+    const segs = splitIntervalByDay(s, e)
+    for (const k in segs) addMs(k, act, segs[k])
+  }
+
+  // Prima/ultima timbratura e timbratura di "fine" per giorno.
+  const firstByDay = {}
+  const endByDay = {}
+  for (const c of sorted) {
+    const k = localDateKey(c.punchedAt)
+    if (!firstByDay[k] || c.punchedAt < firstByDay[k]) firstByDay[k] = c.punchedAt
+    if (normalizeKind(c.kind) === 'end') {
+      if (!endByDay[k] || c.punchedAt > endByDay[k]) endByDay[k] = c.punchedAt
+    }
   }
 
   const daysInMonth = new Date(year, month0 + 1, 0).getDate()
   const rows = []
-  const totals = { worked: 0, ordinary: 0, overtime: 0 }
+  const totals = { work: 0, travel: 0, break: 0, ordinary: 0, overtime: 0, paid: 0 }
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(year, month0, d)
     const k = localDateKey(dateObj)
-    const workedHours = (workedMsByDay[k] || 0) / MS_PER_HOUR
-    const ordinaryHours = Math.min(workedHours, thresholdHours)
-    const overtimeHours = Math.max(0, workedHours - thresholdHours)
-    totals.worked += workedHours
+    const dd = byDay[k] || { work: 0, travel: 0, break: 0 }
+    const workHours = dd.work / MS_PER_HOUR
+    const travelHours = dd.travel / MS_PER_HOUR
+    const breakHours = dd.break / MS_PER_HOUR
+    const ordinaryHours = Math.min(workHours, thresholdHours)
+    const overtimeHours = Math.max(0, workHours - thresholdHours)
+    const paidHours = workHours + travelHours
+    totals.work += workHours
+    totals.travel += travelHours
+    totals.break += breakHours
     totals.ordinary += ordinaryHours
     totals.overtime += overtimeHours
+    totals.paid += paidHours
     const dow = dateObj.getDay()
     const weekday = WEEKDAY_FMT.format(dateObj)
     rows.push({
@@ -153,11 +162,14 @@ export function buildEmployeeTimesheet(clockings, year, month0, thresholdHours) 
       day: d,
       weekday: weekday.charAt(0).toUpperCase() + weekday.slice(1),
       isWeekend: dow === 0 || dow === 6,
-      workedHours,
+      workHours,
+      travelHours,
+      breakHours,
       ordinaryHours,
       overtimeHours,
-      firstIn: formatTimeLocal(firstInByDay[k]),
-      lastOut: formatTimeLocal(lastOutByDay[k]),
+      paidHours,
+      start: formatTimeLocal(firstByDay[k]),
+      end: formatTimeLocal(endByDay[k] || ''),
       notes: notesByDay[k] || [],
     })
   }
@@ -167,7 +179,18 @@ export function buildEmployeeTimesheet(clockings, year, month0, thresholdHours) 
 // --- CSV --------------------------------------------------------------------
 
 const CSV_SEP = ';'
-const CSV_HEADER = ['Giorno', 'Giorno sett.', 'Entrata', 'Uscita', 'Ore lavorate', 'Ore ordinarie', 'Ore straordinarie', 'Note']
+const CSV_HEADER = [
+  'Giorno',
+  'Giorno sett.',
+  'Inizio',
+  'Fine',
+  'Ore lavorate',
+  'di cui straordinarie',
+  'Ore viaggio',
+  'Ore pausa',
+  'Totale retribuito',
+  'Note',
+]
 
 function csvRow(values) {
   return values
@@ -178,27 +201,41 @@ function csvRow(values) {
     .join(CSV_SEP)
 }
 
+function csvDataRow(r) {
+  return [
+    r.date,
+    r.weekday,
+    r.start,
+    r.end,
+    hoursDecimal(r.workHours),
+    hoursDecimal(r.overtimeHours),
+    hoursDecimal(r.travelHours),
+    hoursDecimal(r.breakHours),
+    hoursDecimal(r.paidHours),
+    r.notes.join(' / '),
+  ]
+}
+
+function csvTotalsCells(totals) {
+  return [
+    hoursDecimal(totals.work),
+    hoursDecimal(totals.overtime),
+    hoursDecimal(totals.travel),
+    hoursDecimal(totals.break),
+    hoursDecimal(totals.paid),
+  ]
+}
+
 // CSV di un singolo dipendente (intestazione + righe giornaliere + totali).
 export function timesheetToCsv({ rows, totals }, meta) {
   const lines = []
   lines.push(csvRow(['Dipendente', meta.employeeName]))
   lines.push(csvRow(['Mese', meta.monthLabel]))
-  lines.push(csvRow(['Soglia ore ordinarie/giorno', hoursDecimal(meta.thresholdHours)]))
+  lines.push(csvRow(['Soglia ore ordinarie/giorno (solo lavoro)', hoursDecimal(meta.thresholdHours)]))
   lines.push('')
   lines.push(csvRow(CSV_HEADER))
-  for (const r of rows) {
-    lines.push(csvRow([
-      r.date,
-      r.weekday,
-      r.firstIn,
-      r.lastOut,
-      hoursDecimal(r.workedHours),
-      hoursDecimal(r.ordinaryHours),
-      hoursDecimal(r.overtimeHours),
-      r.notes.join(' / '),
-    ]))
-  }
-  lines.push(csvRow(['Totali', '', '', '', hoursDecimal(totals.worked), hoursDecimal(totals.ordinary), hoursDecimal(totals.overtime), '']))
+  for (const r of rows) lines.push(csvRow(csvDataRow(r)))
+  lines.push(csvRow(['Totali', '', '', '', ...csvTotalsCells(totals), '']))
   return '\uFEFF' + lines.join('\r\n')
 }
 
@@ -206,32 +243,22 @@ export function timesheetToCsv({ rows, totals }, meta) {
 export function combinedTimesheetToCsv(perEmployee, meta) {
   const lines = []
   lines.push(csvRow(['Mese', meta.monthLabel]))
-  lines.push(csvRow(['Soglia ore ordinarie/giorno', hoursDecimal(meta.thresholdHours)]))
+  lines.push(csvRow(['Soglia ore ordinarie/giorno (solo lavoro)', hoursDecimal(meta.thresholdHours)]))
   lines.push('')
   lines.push(csvRow(['Dipendente', ...CSV_HEADER]))
-  const grand = { worked: 0, ordinary: 0, overtime: 0 }
+  const grand = { work: 0, travel: 0, break: 0, overtime: 0, paid: 0 }
   for (const emp of perEmployee) {
-    for (const r of emp.timesheet.rows) {
-      lines.push(csvRow([
-        emp.name,
-        r.date,
-        r.weekday,
-        r.firstIn,
-        r.lastOut,
-        hoursDecimal(r.workedHours),
-        hoursDecimal(r.ordinaryHours),
-        hoursDecimal(r.overtimeHours),
-        r.notes.join(' / '),
-      ]))
-    }
+    for (const r of emp.timesheet.rows) lines.push(csvRow([emp.name, ...csvDataRow(r)]))
     const t = emp.timesheet.totals
-    lines.push(csvRow([`${emp.name} — TOTALE`, '', '', '', '', hoursDecimal(t.worked), hoursDecimal(t.ordinary), hoursDecimal(t.overtime), '']))
+    lines.push(csvRow([`${emp.name} — TOTALE`, '', '', '', '', ...csvTotalsCells(t), '']))
     lines.push('')
-    grand.worked += t.worked
-    grand.ordinary += t.ordinary
+    grand.work += t.work
+    grand.travel += t.travel
+    grand.break += t.break
     grand.overtime += t.overtime
+    grand.paid += t.paid
   }
-  lines.push(csvRow(['TOTALE GENERALE', '', '', '', '', hoursDecimal(grand.worked), hoursDecimal(grand.ordinary), hoursDecimal(grand.overtime), '']))
+  lines.push(csvRow(['TOTALE GENERALE', '', '', '', '', ...csvTotalsCells({ ...grand, ordinary: 0 }), '']))
   return '\uFEFF' + lines.join('\r\n')
 }
 

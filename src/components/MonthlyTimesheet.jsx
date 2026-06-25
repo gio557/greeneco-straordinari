@@ -164,14 +164,16 @@ export default function MonthlyTimesheet({ user }) {
       ) : (
         <>
           <div className="stat-grid ts-summary">
-            <Stat label="Ore lavorate" value={hoursToHM(timesheet.totals.worked)} />
-            <Stat label="Ore ordinarie" value={hoursToHM(timesheet.totals.ordinary)} />
-            <Stat label="Ore straordinarie" value={hoursToHM(timesheet.totals.overtime)} accent="approved" />
+            <Stat label="Ore lavorate" value={hoursToHM(timesheet.totals.work)} />
+            <Stat label="di cui straordinarie" value={hoursToHM(timesheet.totals.overtime)} accent="approved" />
+            <Stat label="Ore viaggio" value={hoursToHM(timesheet.totals.travel)} />
+            <Stat label="Totale retribuito" value={hoursToHM(timesheet.totals.paid)} />
           </div>
 
           <p className="muted small ts-caption">
-            <strong>{selectedName}</strong> · {label} · soglia {hoursDecimal(threshold)} ore/giorno.
-            Le straordinarie sono il tempo effettivo, <strong>non arrotondato</strong>.
+            <strong>{selectedName}</strong> · {label} · soglia {hoursDecimal(threshold)} ore/giorno (solo lavoro).
+            Lo straordinario è calcolato solo sulle ore di lavoro; il viaggio è pagato ma mai
+            straordinario; la pausa non è conteggiata. Valori effettivi, <strong>non arrotondati</strong>.
           </p>
 
           <div className="table-wrap">
@@ -179,11 +181,13 @@ export default function MonthlyTimesheet({ user }) {
               <thead>
                 <tr>
                   <th>Giorno</th>
-                  <th>Entrata</th>
-                  <th>Uscita</th>
+                  <th>Inizio</th>
+                  <th>Fine</th>
                   <th className="num">Lavorate</th>
-                  <th className="num">Ordinarie</th>
-                  <th className="num">Straordinarie</th>
+                  <th className="num">Straord.</th>
+                  <th className="num">Viaggio</th>
+                  <th className="num">Pausa</th>
+                  <th className="num">Retribuito</th>
                   <th>Note</th>
                 </tr>
               </thead>
@@ -193,20 +197,26 @@ export default function MonthlyTimesheet({ user }) {
                     <td data-label="Giorno">
                       {r.weekday} {String(r.day).padStart(2, '0')}
                     </td>
-                    <td data-label="Entrata">{r.firstIn || '—'}</td>
-                    <td data-label="Uscita">{r.lastOut || '—'}</td>
-                    <td data-label="Lavorate" className="num" title={`${hoursDecimal(r.workedHours)} ore`}>
-                      {r.workedHours > 0 ? hoursToHM(r.workedHours) : '—'}
-                    </td>
-                    <td data-label="Ordinarie" className="num" title={`${hoursDecimal(r.ordinaryHours)} ore`}>
-                      {r.ordinaryHours > 0 ? hoursToHM(r.ordinaryHours) : '—'}
+                    <td data-label="Inizio">{r.start || '—'}</td>
+                    <td data-label="Fine">{r.end || '—'}</td>
+                    <td data-label="Lavorate" className="num" title={`${hoursDecimal(r.workHours)} ore`}>
+                      {r.workHours > 0 ? hoursToHM(r.workHours) : '—'}
                     </td>
                     <td
-                      data-label="Straordinarie"
+                      data-label="Straord."
                       className={`num${r.overtimeHours > 0 ? ' ts-ot' : ''}`}
                       title={`${hoursDecimal(r.overtimeHours)} ore`}
                     >
                       {r.overtimeHours > 0 ? hoursToHM(r.overtimeHours) : '—'}
+                    </td>
+                    <td data-label="Viaggio" className="num" title={`${hoursDecimal(r.travelHours)} ore`}>
+                      {r.travelHours > 0 ? hoursToHM(r.travelHours) : '—'}
+                    </td>
+                    <td data-label="Pausa" className="num muted" title={`${hoursDecimal(r.breakHours)} ore`}>
+                      {r.breakHours > 0 ? hoursToHM(r.breakHours) : '—'}
+                    </td>
+                    <td data-label="Retribuito" className="num" title={`${hoursDecimal(r.paidHours)} ore`}>
+                      {r.paidHours > 0 ? hoursToHM(r.paidHours) : '—'}
                     </td>
                     <td data-label="Note" className="ts-notes">
                       {r.notes.length > 0 ? r.notes.join(' · ') : ''}
@@ -219,9 +229,11 @@ export default function MonthlyTimesheet({ user }) {
                   <td data-label="Giorno"><strong>Totali</strong></td>
                   <td></td>
                   <td></td>
-                  <td className="num"><strong>{hoursToHM(timesheet.totals.worked)}</strong></td>
-                  <td className="num"><strong>{hoursToHM(timesheet.totals.ordinary)}</strong></td>
+                  <td className="num"><strong>{hoursToHM(timesheet.totals.work)}</strong></td>
                   <td className="num"><strong>{hoursToHM(timesheet.totals.overtime)}</strong></td>
+                  <td className="num"><strong>{hoursToHM(timesheet.totals.travel)}</strong></td>
+                  <td className="num"><strong>{hoursToHM(timesheet.totals.break)}</strong></td>
+                  <td className="num"><strong>{hoursToHM(timesheet.totals.paid)}</strong></td>
                   <td></td>
                 </tr>
               </tfoot>

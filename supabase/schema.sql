@@ -525,7 +525,13 @@ on conflict (id) do nothing;
 create table if not exists public.time_clockings (
   id          text primary key,
   employee_id text not null references public.profiles (id) on delete cascade,
-  kind        text not null check (kind in ('in', 'out')),
+  -- Tipo di attività che INIZIA con questa timbratura:
+  --   travel = viaggio (pagato, mai straordinario)
+  --   work   = lavoro (ordinario/straordinario)
+  --   break  = pausa (non pagata, non conteggiata)
+  --   end    = fine giornata (chiude l'ultimo segmento)
+  -- 'in'/'out' sono mantenuti per compatibilità con i dati storici.
+  kind        text not null check (kind in ('travel', 'work', 'break', 'end', 'in', 'out')),
   punched_at  timestamptz not null default now(),
   lat         double precision,
   lng         double precision,
@@ -534,6 +540,11 @@ create table if not exists public.time_clockings (
 );
 
 create index if not exists time_clockings_employee_idx on public.time_clockings (employee_id);
+
+-- Aggiorna il vincolo anche sulle installazioni esistenti (idempotente).
+alter table public.time_clockings drop constraint if exists time_clockings_kind_check;
+alter table public.time_clockings add constraint time_clockings_kind_check
+  check (kind in ('travel', 'work', 'break', 'end', 'in', 'out'));
 
 alter table public.time_clockings enable row level security;
 

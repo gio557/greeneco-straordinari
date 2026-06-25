@@ -7,7 +7,7 @@ in vista di un accordo sindacale e dell'eventuale adozione dello strumento.
 
 | | |
 |---|---|
-| **Versione documento** | 0.1 — bozza preliminare |
+| **Versione documento** | 0.2 — bozza preliminare (modello viaggio/lavoro/pausa) |
 | **Data** | 25 giugno 2026 |
 | **Ambito** | Esclusivamente il modulo "Timbrature Presenze" |
 | **Stato dello strumento** | Prototipo dimostrativo (non ancora in esercizio con dati reali) |
@@ -63,22 +63,42 @@ Le finalità perseguite (da confermare e circoscrivere con il Consulente del Lav
 
 ## 3. Come funziona la timbratura (lato dipendente)
 
-1. Il dipendente accede all'applicazione con le proprie credenziali.
-2. Apre la sezione **"Timbrature Presenze"**.
-3. **Alla prima timbratura** viene mostrata un'**informativa** che il lavoratore deve leggere prima di
-   procedere (v. § 6 e § 9 — Allegato A: la versione attuale è un **segnaposto** da sostituire con il
-   testo validato).
-4. Compare una schermata con lo **stato corrente** ("FUORI SERVIZIO" / "IN SERVIZIO") e un unico
-   pulsante grande:
-   - se è fuori servizio → **"Timbra ENTRATA"**;
-   - se è in servizio → **"Timbra USCITA"**.
-5. Premendo il pulsante, **solo in quel momento** l'applicazione richiede la posizione al dispositivo
-   (v. § 5) e registra la timbratura con data e ora.
-6. Lo storico mostra le proprie timbrature, ciascuna con orario e — se disponibile — un collegamento
-   alla posizione su mappa.
+La giornata tipo del personale è articolata in **viaggio di andata → lavoro presso il cliente →
+viaggio di ritorno**, con eventuali **pause** ed eventualmente **più clienti** in giornata. Per
+distinguere correttamente queste fasi, la timbratura adotta un modello **"dichiara attività"**: ad
+ogni passaggio il lavoratore indica l'attività che **inizia** in quel momento; questa timbratura
+**chiude automaticamente** l'attività precedente.
+
+Le attività previste sono:
+
+- **Viaggio** — tempo di trasferimento (pagato, ma **mai** conteggiato come straordinario);
+- **Lavoro** — attività presso il cliente (ordinaria fino alla soglia, poi straordinaria);
+- **Pausa** — pausa pranzo o altra sospensione **non retribuita** (con timbratura di inizio e di
+  ripresa);
+- **Fine giornata** — chiude l'ultima attività.
+
+**Flusso operativo:**
+
+1. Il dipendente accede e apre la sezione **"Timbrature Presenze"**.
+2. **Alla prima timbratura** viene mostrata un'**informativa** da leggere prima di procedere (v. § 9 —
+   Allegato A: la versione attuale è un **segnaposto** da sostituire con il testo validato).
+3. La schermata mostra lo **stato corrente** ("Fuori servizio" / "In viaggio" / "Al lavoro" / "In
+   pausa") e i soli pulsanti pertinenti, ad esempio: da *Al lavoro* sono disponibili `Inizio pausa`,
+   `Inizio viaggio`, `Fine giornata`.
+4. Premendo un pulsante, **solo in quel momento** l'applicazione rileva la posizione (v. § 5) e
+   registra la timbratura con data, ora e attività.
+5. Lo storico mostra le proprie timbrature, ciascuna con attività, orario e — se disponibile — un
+   collegamento alla posizione su mappa.
+
+**Esempio di giornata:** *Inizio viaggio* 08:00 → *Inizio lavoro* 09:30 → *Inizio pausa* 13:00 →
+*Riprendi lavoro* 14:00 → *Inizio viaggio* 17:30 → *Fine giornata* 19:00. Risultato: **lavoro 6:30,
+viaggio 3:00, pausa 1:00 (non pagata)**.
 
 **Caratteristiche rilevanti ai fini della valutazione:**
 
+- Le **ore di viaggio sono separate** da quelle di lavoro e **non concorrono mai allo straordinario**.
+- La **pausa** è delimitata da una timbratura di **inizio** e una di **ripresa** e **non è
+  conteggiata** (né lavoro né viaggio).
 - La rilevazione della posizione avviene **esclusivamente all'atto della singola timbratura**: **non**
   esiste alcun tracciamento continuo o in background.
 - Se il dipendente **nega** il permesso di posizione, o il dato non è disponibile, **la timbratura
@@ -94,7 +114,7 @@ Per ciascuna timbratura il sistema registra i seguenti dati (tabella `time_clock
 |---|---|---|
 | Identificativo timbratura | Codice univoco interno | — |
 | Identificativo lavoratore | Riferimento all'anagrafica dipendente | Pseudonimo/ID, collegato all'anagrafica |
-| Tipo | "Entrata" o "Uscita" | — |
+| Attività | "Viaggio", "Lavoro", "Pausa" o "Fine giornata" | Attività che inizia con la timbratura |
 | Data e ora | Istante della timbratura | Con fuso orario |
 | Latitudine / Longitudine | Posizione al momento della timbratura | **Solo se** consentita/disponibile; può essere assente |
 | Accuratezza | Margine di errore stimato della posizione (metri) | Indicativo |
@@ -149,26 +169,31 @@ Oltre alla vista in tempo reale ("in servizio ora", timbrature recenti), il sist
 **cartellino mensile** per ciascun dipendente.
 
 - **Selezione** del mese (corrente o precedenti) e del dipendente.
-- **Una riga per ogni giorno** del mese, con: prima entrata, ultima uscita, **ore lavorate**,
-  **ore ordinarie** e — in colonna separata — **ore straordinarie**.
+- **Una riga per ogni giorno** del mese, con, in colonne separate: **ore lavorate**, **di cui
+  straordinarie**, **ore viaggio**, **ore pausa** e **totale retribuito** (lavoro + viaggio), oltre a
+  inizio/fine giornata.
 - **Soglia giornaliera** delle ore ordinarie **impostabile** (valore predefinito 8 ore): oltre la
-  soglia, le ore sono conteggiate come straordinario.
-- **Le ore straordinarie NON sono arrotondate:** è riportato il **tempo effettivo** (precisione al
-  minuto a video, valore esatto nei file esportati). Esempio: 1 ora e 30 minuti resta 1:30, non viene
-  arrotondato a unità.
+  soglia, le ore **di solo lavoro** sono conteggiate come straordinario.
+- **Le ore NON sono arrotondate:** è riportato il **tempo effettivo** (precisione al minuto a video,
+  valore esatto nei file esportati). Esempio: 1 ora e 30 minuti resta 1:30.
 - **Esportazione** del cartellino in formato CSV (compatibile con Excel), per singolo dipendente o in
   un unico file per tutto il personale.
 
-**Criterio di calcolo (trasparente e verificabile):** le timbrature di entrata e uscita vengono
-accoppiate in ordine cronologico; ogni coppia entrata→uscita costituisce un intervallo di lavoro, la
-cui durata è sommata nel giorno in cui è svolta (un turno a cavallo della mezzanotte è ripartito tra i
-due giorni). Le ore ordinarie del giorno sono il minimo tra ore lavorate e soglia; le straordinarie
-sono l'eccedenza.
+**Criterio di calcolo (trasparente e verificabile):** le timbrature sono ordinate cronologicamente;
+ogni intervallo tra due timbrature è un **segmento** dell'attività dichiarata dalla prima (viaggio,
+lavoro o pausa), la cui durata è sommata nel giorno in cui è svolta (un segmento a cavallo della
+mezzanotte è ripartito tra i due giorni). Per ciascun giorno:
+
+- **ore di lavoro** = somma dei segmenti di lavoro; **ore di viaggio** = somma dei segmenti di viaggio;
+  **pausa** = somma dei segmenti di pausa (non pagata);
+- **ore ordinarie** = minimo tra ore di lavoro e soglia; **straordinarie** = eccedenza **delle sole
+  ore di lavoro**;
+- il **viaggio è pagato ma non concorre mai allo straordinario**; la **pausa non è retribuita**.
 
 > **Da definire con il Consulente:** se il calcolo dello straordinario debba avvenire su base
-> **giornaliera** (come oggi) o **settimanale/contrattuale**, e il trattamento di festivi, notturni,
-> permessi e assenze. Lo strumento attuale calcola lo **straordinario giornaliero** ed espone un dato
-> **di supporto**, non un cartellino con valore legale (v. § 8).
+> **giornaliera** (come oggi) o **settimanale/contrattuale**; il trattamento di festivi, notturni,
+> permessi e assenze; la **qualificazione e remunerazione delle ore di viaggio** secondo il CCNL
+> applicato. Lo strumento espone un dato **di supporto**, non un cartellino con valore legale (v. § 8).
 
 ---
 
@@ -265,7 +290,7 @@ considerare:
 timbratura {
   id                  identificativo univoco
   dipendente          riferimento all'anagrafica (ID)
-  tipo                "entrata" | "uscita"
+  attivita            "viaggio" | "lavoro" | "pausa" | "fine"
   data_ora            istante della timbratura (con fuso orario)
   latitudine          opzionale (solo se consentita/disponibile)
   longitudine         opzionale (solo se consentita/disponibile)
@@ -275,15 +300,16 @@ timbratura {
 
 ## Allegato C — Esempio illustrativo di cartellino mensile (dati fittizi)
 
-| Giorno | Entrata | Uscita | Ore lavorate | Ore ordinarie | Ore straordinarie | Note |
-|---|---|---|---|---|---|---|
-| Lun 01 | 08:00 | 17:00 | 8:00 | 8:00 | 0:00 | |
-| Mar 02 | 08:00 | 18:30 | 9:30 | 8:00 | 1:30 | |
-| Mer 03 | 08:05 | — | 0:00 | 0:00 | 0:00 | manca uscita |
-| … | | | | | | |
-| **Totali** | | | **17:30** | **16:00** | **1:30** | |
+| Giorno | Inizio | Fine | Lavorate | di cui Straord. | Viaggio | Pausa | Retribuito | Note |
+|---|---|---|---|---|---|---|---|---|
+| Lun 01 | 08:00 | 18:30 | 8:00 | 0:00 | 2:00 | 0:30 | 10:00 | |
+| Mar 02 | 07:30 | 19:00 | 9:30 | 1:30 | 1:30 | 0:30 | 11:00 | |
+| Mer 03 | 08:05 | — | 0:00 | 0:00 | 0:00 | 0:00 | 0:00 | in servizio |
+| … | | | | | | | | |
+| **Totali** | | | **17:30** | **1:30** | **3:30** | **1:00** | **21:00** | |
 
-*(Soglia ore ordinarie/giorno: 8,00. Le ore straordinarie sono il tempo effettivo, non arrotondato.)*
+*(Soglia ore ordinarie/giorno: 8,00, applicata alle sole ore di lavoro. Il viaggio è pagato ma mai
+straordinario; la pausa non è retribuita. Valori effettivi, non arrotondati.)*
 
 ---
 
