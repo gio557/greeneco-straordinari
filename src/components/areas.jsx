@@ -43,26 +43,27 @@ function WrenchIcon() {
   )
 }
 
-// Scarico magazzino: magazzino con freccia in uscita
-function WarehouseIcon() {
+// Scarico magazzino: muletto (carrello elevatore)
+function ForkliftIcon() {
   return (
     <svg {...svgProps}>
-      <path d="M3 9.4 12 5l9 4.4V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
-      <path d="M9 21v-5h6v5" />
-      <path d="M12 8.5v4m0 0 1.8-1.8M12 12.5l-1.8-1.8" />
+      <circle cx="7" cy="18.5" r="1.6" />
+      <circle cx="12" cy="18.5" r="1.6" />
+      <path d="M4.8 16.9V9.5h4l2.2 4.2v3.2" />
+      <path d="M14.5 5.5V17" />
+      <path d="M14.5 16.5h4" />
+      <rect x="14.5" y="7.5" width="4.2" height="4" rx="0.4" />
     </svg>
   )
 }
 
-// Timbrature presenze: impronta (timbratura)
-function FingerprintIcon() {
+// Timbrature presenze: orologio con spunta (presenza registrata)
+function ClockCheckIcon() {
   return (
     <svg {...svgProps}>
-      <path d="M5 11a7 7 0 0 1 13-3.4" />
-      <path d="M8.5 12.4a3.5 3.5 0 0 1 7 0v1.8a7 7 0 0 1-.5 2.6" />
-      <path d="M12 11.4V16a5 5 0 0 0 .7 2.5" />
-      <path d="M6.4 15.4A8 8 0 0 1 6 13" />
-      <path d="M15.6 18.7A9 9 0 0 0 16.9 14" />
+      <circle cx="10.8" cy="10.8" r="6.6" />
+      <path d="M10.8 7.2v3.6l2.4 1.4" />
+      <path d="M14.8 17.6l2.2 2.2 3.7-4" />
     </svg>
   )
 }
@@ -74,7 +75,7 @@ export const AREAS = [
     title: 'Timbrature Presenze',
     subtitle: 'Registra entrate e uscite del personale',
     accent: '#1f7a8c',
-    Icon: FingerprintIcon,
+    Icon: ClockCheckIcon,
     ready: true,
   },
   {
@@ -106,7 +107,7 @@ export const AREAS = [
     title: 'Scarico magazzino',
     subtitle: 'Registra i materiali in uscita',
     accent: '#b7791f',
-    Icon: WarehouseIcon,
+    Icon: ForkliftIcon,
     ready: false,
   },
 ]
