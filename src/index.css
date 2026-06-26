@@ -950,6 +950,24 @@ button:disabled {
 }
 .hub-fine-ico { font-size: 18px; }
 
+/* Ingresso permanente alle proprie sanzioni (quando non ce ne sono di nuove). */
+.hub-fine-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--navy);
+  border-radius: 12px;
+  padding: 11px 14px;
+  margin-bottom: 14px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.hub-fine-link .area-arrow { margin-left: auto; color: var(--muted); }
+
 .fines .page-head { align-items: center; }
 
 .fine-card { display: flex; flex-direction: column; gap: 6px; }

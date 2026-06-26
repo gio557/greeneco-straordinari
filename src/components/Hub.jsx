@@ -15,7 +15,7 @@ function PeopleIcon() {
 }
 
 // Hub delle aree: dopo l'accesso, l'utente sceglie in quale macro-area entrare.
-export default function Hub({ onSelect, user, onLogout, finesPending = 0, onOpenFines }) {
+export default function Hub({ onSelect, user, onLogout, finesPending = 0, finesTotal = 0, onOpenFines }) {
   return (
     <div className="hub">
       {user && (
@@ -36,6 +36,13 @@ export default function Hub({ onSelect, user, onLogout, finesPending = 0, onOpen
               : `Ti sono state addebitate ${finesPending} sanzioni`}
             {' '}— tocca per prendere visione
           </span>
+          <span className="area-arrow" aria-hidden>›</span>
+        </button>
+      )}
+      {finesPending === 0 && finesTotal > 0 && (
+        <button className="hub-fine-link" onClick={onOpenFines}>
+          <span aria-hidden>📋</span>
+          <span>Le mie sanzioni{finesTotal > 1 ? ` (${finesTotal})` : ''}</span>
           <span className="area-arrow" aria-hidden>›</span>
         </button>
       )}

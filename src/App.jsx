@@ -132,6 +132,7 @@ export default function App() {
           user={user}
           onLogout={handleLogout}
           finesPending={unackFines.length}
+          finesTotal={fines.length}
           onOpenFines={() => setArea('sanzioni')}
         />
         {fineModal}
