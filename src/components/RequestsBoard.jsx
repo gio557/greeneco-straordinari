@@ -6,6 +6,7 @@ import {
   decideRequest,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
+import { puo } from '../permissions.js'
 import { formatDate, formatDateTime, formatHours } from '../utils.js'
 import StatusBadge from './StatusBadge.jsx'
 
@@ -17,8 +18,9 @@ const STATUS_FILTERS = [
 ]
 
 // Vista richieste della dashboard: statistiche, filtri e tabella con azioni.
-export default function RequestsBoard({ user }) {
+export default function RequestsBoard({ user, permConfig = null }) {
   const isAdmin = user.role === 'admin'
+  const canDecide = puo(user, 'straordinari.decide', permConfig)
   const [requests, setRequests] = useState([])
   const [userMap, setUserMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -115,6 +117,7 @@ export default function RequestsBoard({ user }) {
                   employee={userMap[r.employeeId]}
                   decider={userMap[r.decidedBy]}
                   actorId={user.id}
+                  canDecide={canDecide}
                   onChanged={refresh}
                 />
               ))}
@@ -135,7 +138,7 @@ function StatCard({ label, value, accent }) {
   )
 }
 
-function RequestRow({ request, employee, decider, actorId, onChanged }) {
+function RequestRow({ request, employee, decider, actorId, canDecide = true, onChanged }) {
   const [open, setOpen] = useState(false)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -169,9 +172,13 @@ function RequestRow({ request, employee, decider, actorId, onChanged }) {
         <td data-label="Stato"><StatusBadge status={request.status} /></td>
         <td data-label="Azioni" className="actions-col">
           {isPending ? (
-            <button className="btn-ghost btn-sm" onClick={() => setOpen((o) => !o)}>
-              {open ? 'Chiudi' : 'Gestisci'}
-            </button>
+            canDecide ? (
+              <button className="btn-ghost btn-sm" onClick={() => setOpen((o) => !o)}>
+                {open ? 'Chiudi' : 'Gestisci'}
+              </button>
+            ) : (
+              <span className="muted small">in attesa</span>
+            )
           ) : (
             <span className="muted small">
               {decider ? `da ${decider.name}` : 'decisa'}

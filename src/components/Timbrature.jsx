@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getLastClocking, getMyClockings, createClocking, subscribeToClockings } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
+import { puo } from '../permissions.js'
 import { requestIpCheck } from '../data/ipCheck.js'
 import { formatDateTime } from '../utils.js'
 import { normalizeKind, ACTIVITIES } from '../timesheet.js'
@@ -79,7 +80,8 @@ const STATE_HINT = {
 
 const ACTIVITY_ICON = { travel: '🚗', work: '🔧', break: '⏸', end: '🏁' }
 
-export default function Timbrature({ user }) {
+export default function Timbrature({ user, permConfig = null }) {
+  const canPunch = puo(user, 'timbrature.timbra', permConfig)
   const [last, setLast] = useState(null)
   const [mine, setMine] = useState([])
   const [loading, setLoading] = useState(true)
@@ -150,20 +152,28 @@ export default function Timbrature({ user }) {
 
       {error && <p className="error">{error}</p>}
 
-      <div className="clock-actions">
-        {actions.map((a) => (
-          <button
-            key={a.kind}
-            className={`btn-primary btn-block big-confirm clock-btn ${a.cls}`}
-            disabled={busy}
-            onClick={() => punch(a.kind)}
-          >
-            {phase === 'locating' ? '📍 Rilevo la posizione…' : busy ? 'Registrazione…' : a.label}
-          </button>
-        ))}
-      </div>
+      {canPunch ? (
+        <>
+          <div className="clock-actions">
+            {actions.map((a) => (
+              <button
+                key={a.kind}
+                className={`btn-primary btn-block big-confirm clock-btn ${a.cls}`}
+                disabled={busy}
+                onClick={() => punch(a.kind)}
+              >
+                {phase === 'locating' ? '📍 Rilevo la posizione…' : busy ? 'Registrazione…' : a.label}
+              </button>
+            ))}
+          </div>
 
-      <p className="muted small center clock-hint">{STATE_HINT[state]}</p>
+          <p className="muted small center clock-hint">{STATE_HINT[state]}</p>
+        </>
+      ) : (
+        <p className="muted small center clock-hint">
+          La timbratura non è abilitata per la tua categoria. Puoi consultare lo storico qui sotto.
+        </p>
+      )}
 
       {pendingCount > 0 && (
         <p className="clock-pending-banner">

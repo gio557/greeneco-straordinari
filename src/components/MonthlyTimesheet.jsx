@@ -10,6 +10,7 @@ import {
   monthLabel,
   slugify,
 } from '../timesheet.js'
+import { puo } from '../permissions.js'
 
 const DEFAULT_THRESHOLD = 8
 
@@ -25,8 +26,9 @@ function parseMonth(value) {
 
 // Riepilogo mensile delle presenze: una tabella per dipendente (giorno per
 // giorno) con ore ordinarie e straordinarie, scaricabile in CSV.
-export default function MonthlyTimesheet({ user }) {
+export default function MonthlyTimesheet({ user, permConfig = null }) {
   const isAdmin = user.role === 'admin'
+  const canExport = puo(user, 'timbrature.export', permConfig)
   const [month, setMonth] = useState(currentMonthValue)
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD)
   const [selectedEmp, setSelectedEmp] = useState('')
@@ -147,14 +149,16 @@ export default function MonthlyTimesheet({ user }) {
           </select>
         </label>
 
-        <div className="ts-actions">
-          <button className="btn-ghost" onClick={downloadOne} disabled={!timesheet}>
-            ⬇ Scarica CSV
-          </button>
-          <button className="btn-ghost" onClick={downloadAll} disabled={employees.length === 0}>
-            ⬇ Scarica tutti
-          </button>
-        </div>
+        {canExport && (
+          <div className="ts-actions">
+            <button className="btn-ghost" onClick={downloadOne} disabled={!timesheet}>
+              ⬇ Scarica CSV
+            </button>
+            <button className="btn-ghost" onClick={downloadAll} disabled={employees.length === 0}>
+              ⬇ Scarica tutti
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (

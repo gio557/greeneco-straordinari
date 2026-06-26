@@ -3,6 +3,7 @@ import {
   listVehicles, getUserMap, getAllFines, getHandoverAt, createFine, cancelFine, subscribeToFines, uploadFineScan,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
+import { puo } from '../permissions.js'
 import { useFineAttachments } from '../data/useFineAttachments.js'
 import { formatDateTime } from '../utils.js'
 import { FINE_STATUS, formatEuro } from '../fines.js'
@@ -10,8 +11,10 @@ import FineAttachment from './FineAttachment.jsx'
 
 // Gestione sanzioni per manager/admin: registrazione (con attribuzione proposta
 // dal passaggio di consegna attivo alla data dell'infrazione) ed elenco.
-export default function VehicleFines({ user }) {
+export default function VehicleFines({ user, permConfig = null }) {
   const isAdmin = user.role === 'admin'
+  const canManage = puo(user, 'multe.manage', permConfig)
+  const canCancel = puo(user, 'multe.cancel', permConfig)
   const [vehicles, setVehicles] = useState([])
   const [userMap, setUserMap] = useState({})
   const [fines, setFines] = useState([])
@@ -49,10 +52,12 @@ export default function VehicleFines({ user }) {
     <div className="fines">
       <div className="page-head">
         <h3 className="mini-title">Sanzioni</h3>
-        <button className="btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Registra multa</button>
+        {canManage && (
+          <button className="btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Registra multa</button>
+        )}
       </div>
 
-      {showForm && (
+      {showForm && canManage && (
         <FineForm
           vehicles={vehicles}
           employees={employees}
@@ -86,7 +91,7 @@ export default function VehicleFines({ user }) {
                   {f.acknowledgedAt && <div className="muted small">Presa visione: {formatDateTime(f.acknowledgedAt)}</div>}
                   {f.status === 'contested' && <div className="request-note">Contestazione: {f.contestNote || '(senza nota)'}</div>}
                 </div>
-                {f.status !== 'cancelled' && (
+                {f.status !== 'cancelled' && canCancel && (
                   <div className="decision-actions">
                     <button className="btn-ghost btn-sm" onClick={() => annulla(f)}>Annulla multa</button>
                   </div>

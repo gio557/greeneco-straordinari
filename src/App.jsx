@@ -158,13 +158,24 @@ export default function App() {
       </>
     )
 
-  const isStaff = user.role === 'manager' || user.role === 'admin'
+  // Quale "faccia" di un'area mostrare è deciso dai permessi della categoria:
+  // chi ha il flag *.board vede il cruscotto di gestione, gli altri la vista
+  // personale. (Gli admin hanno sempre tutti i flag.) Finché la configurazione
+  // non è stata caricata si ripiega sul vecchio comportamento per ruolo, così
+  // non c'è "lampeggio" di una vista sbagliata.
+  const staffFallback = user.role === 'manager' || user.role === 'admin'
+  const seeBoard = (perm) => (permConfig ? puo(user, perm, permConfig) : staffFallback)
+  const seeStraordinariBoard = seeBoard('straordinari.board')
+  const seeAutomezziBoard = seeBoard('automezzi.board')
+  const seeTimbratureBoard = seeBoard('timbrature.board')
 
   if (area === 'straordinari') {
     return (
-      <div className={isStaff ? 'app app-wide' : 'app'}>
+      <div className={seeStraordinariBoard ? 'app app-wide' : 'app'}>
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
-        {isStaff ? <Dashboard user={user} /> : <EmployeeHome user={user} />}
+        {seeStraordinariBoard
+          ? <Dashboard user={user} permConfig={permConfig} />
+          : <EmployeeHome user={user} permConfig={permConfig} />}
       </div>
     )
   }
@@ -193,18 +204,22 @@ export default function App() {
 
   if (area === 'automezzi') {
     return (
-      <div className={isStaff ? 'app app-wide' : 'app'}>
+      <div className={seeAutomezziBoard ? 'app app-wide' : 'app'}>
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
-        {isStaff ? <VehiclesDashboard user={user} /> : <VehicleHandover user={user} onBack={backToHub} />}
+        {seeAutomezziBoard
+          ? <VehiclesDashboard user={user} permConfig={permConfig} />
+          : <VehicleHandover user={user} onBack={backToHub} permConfig={permConfig} />}
       </div>
     )
   }
 
   if (area === 'timbrature') {
     return (
-      <div className={isStaff ? 'app app-wide' : 'app'}>
+      <div className={seeTimbratureBoard ? 'app app-wide' : 'app'}>
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
-        {isStaff ? <TimbratureBoard user={user} /> : <Timbrature user={user} />}
+        {seeTimbratureBoard
+          ? <TimbratureBoard user={user} permConfig={permConfig} />
+          : <Timbrature user={user} permConfig={permConfig} />}
       </div>
     )
   }
@@ -213,7 +228,7 @@ export default function App() {
     return (
       <div className="app">
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
-        <CassettoDipendente user={user} initialSub={cassettoSub} onChangeFines={reloadFines} />
+        <CassettoDipendente user={user} initialSub={cassettoSub} onChangeFines={reloadFines} permConfig={permConfig} />
       </div>
     )
   }

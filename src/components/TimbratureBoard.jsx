@@ -11,7 +11,7 @@ const STATE_LABEL = { travel: 'In viaggio', work: 'Al lavoro', break: 'In pausa'
 // Vista presenze per manager/admin. Il manager vede il proprio team, l'admin
 // tutti. (Su impianto prototipo il filtro è applicativo; con auth reale + RLS
 // diventerà un controllo d'accesso forte.)
-export default function TimbratureBoard({ user }) {
+export default function TimbratureBoard({ user, permConfig = null }) {
   const isAdmin = user.role === 'admin'
   const [view, setView] = useState('live')
   const [clockings, setClockings] = useState([])
@@ -76,7 +76,7 @@ export default function TimbratureBoard({ user }) {
       </div>
 
       {view === 'month' ? (
-        <MonthlyTimesheet user={user} />
+        <MonthlyTimesheet user={user} permConfig={permConfig} />
       ) : (
       <div className="board">
         <div className="stat-grid">

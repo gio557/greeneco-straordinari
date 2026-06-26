@@ -43,3 +43,20 @@ test('config assente: non blocca (anti-lockout)', () => {
   const u = { id: 'e', role: 'employee', department: 'Operativo' }
   assert.equal(puo(u, 'area.utenti', null), true)
 })
+
+test('Fase 2: disattivare un flag blocca davvero l\'azione (categoria non-admin)', () => {
+  // Categoria personalizzata con la sola timbratura attiva.
+  const custom = {
+    categories: [...cfg.categories, 'Solo Presenze'],
+    perms: { ...cfg.perms, 'Solo Presenze': { 'area.timbrature': true, 'timbrature.timbra': true } },
+  }
+  const u = { id: 'k', role: 'employee', department: 'Solo Presenze' }
+  assert.equal(puo(u, 'timbrature.timbra', custom), true)
+  // Flag non presenti → false (creazione straordinari, presa in carico, multe…).
+  assert.equal(puo(u, 'straordinari.create', custom), false)
+  assert.equal(puo(u, 'automezzi.handover', custom), false)
+  assert.equal(puo(u, 'multe.view_own', custom), false)
+  // Spegnendo esplicitamente un flag, l'azione si blocca.
+  const off = { ...custom, perms: { ...custom.perms, 'Solo Presenze': { ...custom.perms['Solo Presenze'], 'timbrature.timbra': false } } }
+  assert.equal(puo(u, 'timbrature.timbra', off), false)
+})
