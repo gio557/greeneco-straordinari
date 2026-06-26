@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { supabase } from './supabaseClient.js'
+import { defaultPermConfig } from '../permissions.js'
 
 const REQUESTS_TABLE = 'overtime_requests'
 const PROFILES_TABLE = 'profiles'
@@ -837,6 +838,24 @@ export function subscribeToDocuments(onChange) {
   return () => {
     supabase.removeChannel(channel)
   }
+}
+
+// ===========================================================================
+// CATEGORIE & PERMESSI (configurazione)
+// ===========================================================================
+
+export async function getPermissionsConfig() {
+  const { data, error } = await supabase
+    .from('app_config').select('value').eq('key', 'permissions').maybeSingle()
+  if (error) throw new Error(error.message)
+  return data?.value || defaultPermConfig()
+}
+
+export async function savePermissionsConfig(config) {
+  const { error } = await supabase
+    .from('app_config')
+    .upsert({ key: 'permissions', value: config, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  if (error) throw new Error(error.message)
 }
 
 // ===========================================================================
