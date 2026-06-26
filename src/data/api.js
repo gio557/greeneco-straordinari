@@ -60,6 +60,15 @@ export const adminUpsertVehicle = impl.adminUpsertVehicle
 export const adminDeleteVehicle = impl.adminDeleteVehicle
 export const subscribeToVehicleData = impl.subscribeToVehicleData
 
+// Multe / Sanzioni sui mezzi
+export const createFine = impl.createFine
+export const getFinesForEmployee = impl.getFinesForEmployee
+export const getAllFines = impl.getAllFines
+export const acknowledgeFine = impl.acknowledgeFine
+export const contestFine = impl.contestFine
+export const cancelFine = impl.cancelFine
+export const subscribeToFines = impl.subscribeToFines
+
 // Timbrature presenze (con buffer di sicurezza in modalità Supabase)
 export const getLastClocking = clk.getLastClocking
 export const getMyClockings = clk.getMyClockings

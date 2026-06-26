@@ -461,6 +461,109 @@ export function subscribeToVehicleData(onChange) {
 }
 
 // ===========================================================================
+// MULTE / SANZIONI sui mezzi
+// ===========================================================================
+
+function rowToFine(f) {
+  return {
+    id: f.id,
+    vehicleId: f.vehicle_id,
+    employeeId: f.employee_id,
+    infractionAt: f.infraction_at,
+    amount: f.amount != null ? Number(f.amount) : null,
+    place: f.place ?? '',
+    type: f.type ?? '',
+    verbale: f.verbale ?? '',
+    note: f.note ?? '',
+    status: f.status,
+    acknowledgedAt: f.acknowledged_at,
+    contestedAt: f.contested_at,
+    contestNote: f.contest_note ?? '',
+    recordedBy: f.recorded_by,
+    recordedAt: f.recorded_at,
+  }
+}
+
+export async function createFine({ vehicleId, employeeId, infractionAt, amount, place, type, verbale, note, recordedBy }) {
+  const { data, error } = await supabase
+    .from('vehicle_fines')
+    .insert({
+      id: `fine-${Date.now()}`,
+      vehicle_id: vehicleId,
+      employee_id: employeeId,
+      infraction_at: infractionAt,
+      amount: amount ?? null,
+      place: place || null,
+      type: type || null,
+      verbale: verbale || null,
+      note: (note || '').trim(),
+      recorded_by: recordedBy || null,
+    })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return rowToFine(data)
+}
+
+export async function getFinesForEmployee(employeeId) {
+  const { data, error } = await supabase
+    .from('vehicle_fines')
+    .select('*')
+    .eq('employee_id', employeeId)
+    .neq('status', 'cancelled')
+    .order('infraction_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data.map(rowToFine)
+}
+
+export async function getAllFines() {
+  const { data, error } = await supabase
+    .from('vehicle_fines')
+    .select('*')
+    .order('infraction_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data.map(rowToFine)
+}
+
+export async function acknowledgeFine(fineId, employeeId) {
+  const { error } = await supabase
+    .from('vehicle_fines')
+    .update({ status: 'acknowledged', acknowledged_at: new Date().toISOString() })
+    .eq('id', fineId)
+    .eq('employee_id', employeeId)
+    .eq('status', 'registered')
+  if (error) throw new Error(error.message)
+}
+
+export async function contestFine(fineId, employeeId, contestNote) {
+  const { error } = await supabase
+    .from('vehicle_fines')
+    .update({ status: 'contested', contested_at: new Date().toISOString(), contest_note: (contestNote || '').trim() })
+    .eq('id', fineId)
+    .eq('employee_id', employeeId)
+    .in('status', ['registered', 'acknowledged'])
+  if (error) throw new Error(error.message)
+}
+
+export async function cancelFine(fineId) {
+  const { error } = await supabase
+    .from('vehicle_fines')
+    .update({ status: 'cancelled' })
+    .eq('id', fineId)
+  if (error) throw new Error(error.message)
+}
+
+export function subscribeToFines(onChange) {
+  const channel = supabase
+    .channel('vehicle_fines_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicle_fines' }, onChange)
+    .subscribe()
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+// ===========================================================================
 // TIMBRATURE PRESENZE (prototipo)
 // ===========================================================================
 

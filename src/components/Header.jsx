@@ -7,7 +7,7 @@ const ROLE_LABELS = {
   employee: 'Dipendente',
 }
 
-export default function Header({ user, onLogout, onBack }) {
+export default function Header({ user, onLogout, onBack, finesCount = 0 }) {
   const roleLabel = ROLE_LABELS[user.role] ?? 'Utente'
   const pending = usePendingClockings()
   return (
@@ -32,6 +32,11 @@ export default function Header({ user, onLogout, onBack }) {
           Esci
         </button>
       </div>
+      {finesCount > 0 && (
+        <div className="header-fine" role="status">
+          ⚠️ {finesCount === 1 ? '1 sanzione da prendere visione' : `${finesCount} sanzioni da prendere visione`}
+        </div>
+      )}
       {pending > 0 && (
         <div className="header-pending" role="status">
           ⏳ {pending === 1 ? '1 timbratura' : `${pending} timbrature`} su questo dispositivo in attesa di invio — verrà{pending === 1 ? '' : 'anno'} inviata{pending === 1 ? '' : 'e'} appena torna la rete

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { login } from './data/api.js'
+import { login, getFinesForEmployee, acknowledgeFine } from './data/api.js'
 import Welcome from './components/Welcome.jsx'
 import Hub from './components/Hub.jsx'
 import Login from './components/Login.jsx'
@@ -11,6 +11,8 @@ import VehicleHandover from './components/VehicleHandover.jsx'
 import VehiclesDashboard from './components/VehiclesDashboard.jsx'
 import Timbrature from './components/Timbrature.jsx'
 import TimbratureBoard from './components/TimbratureBoard.jsx'
+import EmployeeFines from './components/EmployeeFines.jsx'
+import FineNoticeModal from './components/FineNoticeModal.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 const SESSION_KEY = 'straordinari_session'
@@ -22,6 +24,10 @@ export default function App() {
   // Mezzo da prendere in carico arrivato via QR/deep-link (?vehicle=...).
   const [pendingVehicle, setPendingVehicle] = useState(null)
   const [ready, setReady] = useState(false)
+  // Sanzioni del dipendente (per notifica/badge/modale).
+  const [fines, setFines] = useState([])
+  const [fineModalSeen, setFineModalSeen] = useState(false)
+  const [ackBusy, setAckBusy] = useState(false)
 
   useEffect(() => {
     // Deep-link da QR: ?vehicle=ID → avvia la presa in carico di quel mezzo.
@@ -41,6 +47,19 @@ export default function App() {
     setReady(true)
   }, [])
 
+  // Carica le sanzioni del dipendente loggato (per badge, banner e modale).
+  useEffect(() => {
+    if (user?.role === 'employee') {
+      getFinesForEmployee(user.id).then(setFines).catch(() => {})
+    } else {
+      setFines([])
+    }
+  }, [user])
+
+  function reloadFines() {
+    if (user?.role === 'employee') getFinesForEmployee(user.id).then(setFines).catch(() => {})
+  }
+
   async function handleLogin(identifier, password) {
     const u = await login(identifier, password)
     localStorage.setItem(SESSION_KEY, JSON.stringify(u))
@@ -53,6 +72,8 @@ export default function App() {
     setAuthRole(null)
     setArea(null)
     setPendingVehicle(null)
+    setFines([])
+    setFineModalSeen(false)
   }
 
   function backToHub() {
@@ -67,11 +88,32 @@ export default function App() {
     return <Login role={authRole} onLogin={handleLogin} onBack={() => setAuthRole(null)} />
   }
 
+  // Sanzioni non ancora prese in visione (per badge, banner e modale di avviso).
+  const unackFines = fines.filter((f) => f.status === 'registered')
+  const fineModal =
+    user.role === 'employee' && unackFines.length > 0 && !fineModalSeen ? (
+      <FineNoticeModal
+        fines={unackFines}
+        busy={ackBusy}
+        onAcknowledgeAll={async () => {
+          setAckBusy(true)
+          for (const f of unackFines) {
+            try { await acknowledgeFine(f.id, user.id) } catch { /* ignore */ }
+          }
+          reloadFines()
+          setAckBusy(false)
+          setFineModalSeen(true)
+        }}
+        onOpenDetails={() => { setFineModalSeen(true); setArea('sanzioni') }}
+        onClose={() => setFineModalSeen(true)}
+      />
+    ) : null
+
   // --- Presa in carico mezzo via QR (ha la precedenza, per qualsiasi ruolo) ---
   if (pendingVehicle) {
     return (
       <div className="app">
-        <Header user={user} onLogout={handleLogout} onBack={() => setPendingVehicle(null)} />
+        <Header user={user} onLogout={handleLogout} onBack={() => setPendingVehicle(null)} finesCount={unackFines.length} />
         <VehicleHandover
           user={user}
           vehicleId={pendingVehicle}
@@ -82,14 +124,26 @@ export default function App() {
   }
 
   // --- Autenticato: hub delle aree, poi schermata in base all'area/ruolo ---
-  if (!area) return <Hub onSelect={setArea} user={user} onLogout={handleLogout} />
+  if (!area)
+    return (
+      <>
+        <Hub
+          onSelect={setArea}
+          user={user}
+          onLogout={handleLogout}
+          finesPending={unackFines.length}
+          onOpenFines={() => setArea('sanzioni')}
+        />
+        {fineModal}
+      </>
+    )
 
   const isStaff = user.role === 'manager' || user.role === 'admin'
 
   if (area === 'straordinari') {
     return (
       <div className={isStaff ? 'app app-wide' : 'app'}>
-        <Header user={user} onLogout={handleLogout} onBack={backToHub} />
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
         {isStaff ? <Dashboard user={user} /> : <EmployeeHome user={user} />}
       </div>
     )
@@ -98,7 +152,7 @@ export default function App() {
   if (area === 'utenti' && user.role === 'admin') {
     return (
       <div className="app app-wide">
-        <Header user={user} onLogout={handleLogout} onBack={backToHub} />
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
         <main className="content dashboard">
           <UsersAdmin admin={user} />
         </main>
@@ -109,7 +163,7 @@ export default function App() {
   if (area === 'automezzi') {
     return (
       <div className={isStaff ? 'app app-wide' : 'app'}>
-        <Header user={user} onLogout={handleLogout} onBack={backToHub} />
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
         {isStaff ? <VehiclesDashboard user={user} /> : <VehicleHandover user={user} onBack={backToHub} />}
       </div>
     )
@@ -118,8 +172,17 @@ export default function App() {
   if (area === 'timbrature') {
     return (
       <div className={isStaff ? 'app app-wide' : 'app'}>
-        <Header user={user} onLogout={handleLogout} onBack={backToHub} />
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
         {isStaff ? <TimbratureBoard user={user} /> : <Timbrature user={user} />}
+      </div>
+    )
+  }
+
+  if (area === 'sanzioni') {
+    return (
+      <div className="app">
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
+        <EmployeeFines user={user} onChange={reloadFines} />
       </div>
     )
   }

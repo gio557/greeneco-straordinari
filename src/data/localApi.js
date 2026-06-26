@@ -26,6 +26,27 @@ function load() {
     handovers: [],
     issues: [],
     clockings: [],
+    // Una sanzione dimostrativa (non ancora presa in visione) per mostrare la
+    // notifica al dipendente in modalità demo.
+    fines: [
+      {
+        id: 'fine-demo-1',
+        vehicleId: VEHICLES[0]?.id,
+        employeeId: 'emp-1',
+        infractionAt: '2026-06-20T10:15:00+02:00',
+        amount: 42,
+        place: 'Via Roma, Torino',
+        type: 'Divieto di sosta',
+        verbale: 'TO-2026-12345',
+        note: '',
+        status: 'registered',
+        acknowledgedAt: null,
+        contestedAt: null,
+        contestNote: '',
+        recordedBy: 'admin',
+        recordedAt: '2026-06-24T09:00:00+02:00',
+      },
+    ],
   }
   save(initial)
   return initial
@@ -378,6 +399,83 @@ export async function adminDeleteVehicle(adminId, vehicleId) {
 }
 
 export function subscribeToVehicleData() {
+  return () => {}
+}
+
+// --- Multe / Sanzioni ------------------------------------------------------
+
+export async function createFine({ vehicleId, employeeId, infractionAt, amount, place, type, verbale, note, recordedBy }) {
+  await delay()
+  const state = load()
+  state.fines = state.fines || []
+  const fine = {
+    id: `fine-${Date.now()}`,
+    vehicleId,
+    employeeId,
+    infractionAt,
+    amount: amount ?? null,
+    place: place || '',
+    type: type || '',
+    verbale: verbale || '',
+    note: (note || '').trim(),
+    status: 'registered',
+    acknowledgedAt: null,
+    contestedAt: null,
+    contestNote: '',
+    recordedBy: recordedBy || null,
+    recordedAt: new Date().toISOString(),
+  }
+  state.fines.push(fine)
+  save(state)
+  return fine
+}
+
+export async function getFinesForEmployee(employeeId) {
+  await delay(80)
+  return (load().fines || [])
+    .filter((f) => f.employeeId === employeeId && f.status !== 'cancelled')
+    .sort((a, b) => b.infractionAt.localeCompare(a.infractionAt))
+}
+
+export async function getAllFines() {
+  await delay(80)
+  return (load().fines || []).slice().sort((a, b) => b.infractionAt.localeCompare(a.infractionAt))
+}
+
+export async function acknowledgeFine(fineId, employeeId) {
+  await delay()
+  const state = load()
+  const f = (state.fines || []).find((x) => x.id === fineId && x.employeeId === employeeId)
+  if (f && f.status === 'registered') {
+    f.status = 'acknowledged'
+    f.acknowledgedAt = new Date().toISOString()
+    save(state)
+  }
+}
+
+export async function contestFine(fineId, employeeId, contestNote) {
+  await delay()
+  const state = load()
+  const f = (state.fines || []).find((x) => x.id === fineId && x.employeeId === employeeId)
+  if (f && (f.status === 'registered' || f.status === 'acknowledged')) {
+    f.status = 'contested'
+    f.contestedAt = new Date().toISOString()
+    f.contestNote = (contestNote || '').trim()
+    save(state)
+  }
+}
+
+export async function cancelFine(fineId) {
+  await delay()
+  const state = load()
+  const f = (state.fines || []).find((x) => x.id === fineId)
+  if (f) {
+    f.status = 'cancelled'
+    save(state)
+  }
+}
+
+export function subscribeToFines() {
   return () => {}
 }
 

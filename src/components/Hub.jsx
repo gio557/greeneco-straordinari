@@ -15,7 +15,7 @@ function PeopleIcon() {
 }
 
 // Hub delle aree: dopo l'accesso, l'utente sceglie in quale macro-area entrare.
-export default function Hub({ onSelect, user, onLogout }) {
+export default function Hub({ onSelect, user, onLogout, finesPending = 0, onOpenFines }) {
   return (
     <div className="hub">
       {user && (
@@ -25,6 +25,19 @@ export default function Hub({ onSelect, user, onLogout }) {
           </span>
           <button className="btn-ghost btn-sm" onClick={onLogout}>Esci</button>
         </div>
+      )}
+
+      {finesPending > 0 && (
+        <button className="hub-fine-banner" onClick={onOpenFines}>
+          <span className="hub-fine-ico" aria-hidden>⚠️</span>
+          <span>
+            {finesPending === 1
+              ? 'Ti è stata addebitata una sanzione'
+              : `Ti sono state addebitate ${finesPending} sanzioni`}
+            {' '}— tocca per prendere visione
+          </span>
+          <span className="area-arrow" aria-hidden>›</span>
+        </button>
       )}
       <div className="login-brand">
         <img className="login-logo" src="./greeneco-logo.jpeg" alt="greeneco wastewater" />

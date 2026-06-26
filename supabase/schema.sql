@@ -425,6 +425,54 @@ create policy "issues_insert_anon" on public.vehicle_issues for insert to anon, 
 drop policy if exists "issues_update_anon" on public.vehicle_issues;
 create policy "issues_update_anon" on public.vehicle_issues for update to anon, authenticated using (true) with check (true);
 
+-- ===========================================================================
+-- MULTE / SANZIONI sui mezzi, addebitate al dipendente responsabile.
+-- L'attribuzione è proposta dal passaggio di consegna attivo alla data
+-- dell'infrazione e confermata dal manager. Flusso stato:
+--   registered  -> il dipendente non ha ancora preso visione
+--   acknowledged-> presa visione registrata
+--   contested   -> il dipendente contesta (con nota)
+--   cancelled   -> annullata dal manager
+-- L'app registra/notifica/raccoglie la presa visione: l'eventuale trattenuta
+-- resta una decisione HR/paghe con i suoi presupposti di legge.
+-- ===========================================================================
+create table if not exists public.vehicle_fines (
+  id              text primary key,
+  vehicle_id      text not null references public.vehicles (id) on delete cascade,
+  employee_id     text not null references public.profiles (id),
+  infraction_at   timestamptz not null,
+  amount          numeric(10,2),
+  place           text,
+  type            text,
+  verbale         text,
+  note            text default '',
+  status          text not null default 'registered'
+                    check (status in ('registered', 'acknowledged', 'contested', 'cancelled')),
+  acknowledged_at timestamptz,
+  contested_at    timestamptz,
+  contest_note    text,
+  recorded_by     text references public.profiles (id),
+  recorded_at     timestamptz not null default now()
+);
+
+create index if not exists vehicle_fines_employee_idx on public.vehicle_fines (employee_id);
+create index if not exists vehicle_fines_vehicle_idx on public.vehicle_fines (vehicle_id);
+
+alter table public.vehicle_fines enable row level security;
+drop policy if exists "fines_select_anon" on public.vehicle_fines;
+create policy "fines_select_anon" on public.vehicle_fines for select to anon, authenticated using (true);
+drop policy if exists "fines_insert_anon" on public.vehicle_fines;
+create policy "fines_insert_anon" on public.vehicle_fines for insert to anon, authenticated with check (true);
+drop policy if exists "fines_update_anon" on public.vehicle_fines;
+create policy "fines_update_anon" on public.vehicle_fines for update to anon, authenticated using (true) with check (true);
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='vehicle_fines') then
+    alter publication supabase_realtime add table public.vehicle_fines;
+  end if;
+end $$;
+
 -- Funzioni admin per l'anagrafica mezzi.
 create or replace function public.admin_upsert_vehicle(
   p_admin_id   text,

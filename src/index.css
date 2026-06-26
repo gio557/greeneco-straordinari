@@ -105,6 +105,19 @@ button {
   text-align: center;
 }
 
+/* Avviso (intestazione) di sanzioni da prendere visione. */
+.header-fine {
+  margin-top: 10px;
+  background: var(--red-bg);
+  color: var(--red);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 7px 12px;
+  border-radius: 8px;
+  text-align: center;
+}
+
 .app-header-user {
   display: flex;
   align-items: center;
@@ -913,6 +926,63 @@ button:disabled {
 .dash-table tr.row-verify {
   background: var(--amber-bg);
 }
+
+/* ---------- Multe / Sanzioni ---------- */
+.badge-muted {
+  background: #eef1f5;
+  color: var(--muted);
+}
+
+.hub-fine-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--red);
+  background: var(--red-bg);
+  color: var(--red);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.hub-fine-ico { font-size: 18px; }
+
+.fines .page-head { align-items: center; }
+
+.fine-card { display: flex; flex-direction: column; gap: 6px; }
+.fine-amount {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.fine-meta { font-size: 13px; color: var(--text); display: flex; flex-direction: column; gap: 2px; }
+.fine-meta .muted { color: var(--muted); }
+
+/* Finestra modale (registrazione multa, avviso sanzioni). */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 59, 102, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 50;
+}
+.modal-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow: auto;
+}
+.modal-card .mini-title { margin-top: 0; }
 
 /* --- Filtri --- */
 .dash-filters {
