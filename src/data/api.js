@@ -82,6 +82,10 @@ export const acknowledgeDocument = impl.acknowledgeDocument
 export const deleteEmployeeDocument = impl.deleteEmployeeDocument
 export const subscribeToDocuments = impl.subscribeToDocuments
 
+// Categorie & Permessi
+export const getPermissionsConfig = impl.getPermissionsConfig
+export const savePermissionsConfig = impl.savePermissionsConfig
+
 // Timbrature presenze (con buffer di sicurezza in modalità Supabase)
 export const getLastClocking = clk.getLastClocking
 export const getMyClockings = clk.getMyClockings

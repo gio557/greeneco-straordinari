@@ -565,6 +565,20 @@ drop policy if exists "emp_docs_delete" on storage.objects;
 create policy "emp_docs_delete" on storage.objects for delete to anon, authenticated
   using (bucket_id = 'employee-docs');
 
+-- Configurazione applicativa (chiave→valore JSON). Usata per categorie e permessi.
+create table if not exists public.app_config (
+  key        text primary key,
+  value      jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_config enable row level security;
+drop policy if exists "config_select_anon" on public.app_config;
+create policy "config_select_anon" on public.app_config for select to anon, authenticated using (true);
+drop policy if exists "config_insert_anon" on public.app_config;
+create policy "config_insert_anon" on public.app_config for insert to anon, authenticated with check (true);
+drop policy if exists "config_update_anon" on public.app_config;
+create policy "config_update_anon" on public.app_config for update to anon, authenticated using (true) with check (true);
+
 -- Funzioni admin per l'anagrafica mezzi.
 create or replace function public.admin_upsert_vehicle(
   p_admin_id   text,

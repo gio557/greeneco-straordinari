@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { adminListUsers, adminUpsertUser, adminDeleteUser, exportAllData } from '../data/api.js'
+import { adminListUsers, adminUpsertUser, adminDeleteUser, exportAllData, getPermissionsConfig } from '../data/api.js'
 import { downloadTextFile } from '../timesheet.js'
 import { initials } from '../utils.js'
 
@@ -37,6 +37,11 @@ export default function UsersAdmin({ admin }) {
   const [section, setSection] = useState(null) // null | 'managers' | 'employees' | 'admins'
   const [editing, setEditing] = useState(null) // null | 'new' | user
   const [exporting, setExporting] = useState(false)
+  const [categories, setCategories] = useState([])
+
+  useEffect(() => {
+    getPermissionsConfig().then((cfg) => setCategories(cfg.categories || [])).catch(() => {})
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -99,6 +104,7 @@ export default function UsersAdmin({ admin }) {
           user={editing === 'new' ? null : editing}
           managers={managers}
           employees={employees}
+          categories={categories}
           onCancel={() => setEditing(null)}
           onSaved={async () => { setEditing(null); await load() }}
         />
@@ -237,7 +243,7 @@ function teamCount(managerId, employees) {
   return n === 0 ? '—' : `${n}`
 }
 
-function UserForm({ admin, role, user, managers, employees, onCancel, onSaved }) {
+function UserForm({ admin, role, user, managers, employees, categories = [], onCancel, onSaved }) {
   const isNew = !user
   const [form, setForm] = useState({
     id: user?.id ?? '',
@@ -319,8 +325,15 @@ function UserForm({ admin, role, user, managers, employees, onCancel, onSaved })
           <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </label>
         <label className="field">
-          <span className="field-label">Reparto</span>
-          <input className="input" value={form.department} onChange={(e) => set('department', e.target.value)} />
+          <span className="field-label">Reparto / categoria</span>
+          <select className="input" value={form.department} onChange={(e) => set('department', e.target.value)}>
+            <option value="">— Nessuno —</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            {form.department && !categories.includes(form.department) && (
+              <option value={form.department}>{form.department} (non più in elenco)</option>
+            )}
+          </select>
+          <span className="field-hint">Determina cosa l'utente può vedere e fare (Categorie &amp; Permessi).</span>
         </label>
         <label className="field">
           <span className="field-label">Email</span>

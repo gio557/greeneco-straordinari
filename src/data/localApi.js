@@ -10,6 +10,7 @@
 import { USERS, REQUESTS, CREDENTIALS, VEHICLES } from './seed.js'
 import { findHandoverAt } from '../fines.js'
 import { filterDocuments } from '../documents.js'
+import { defaultPermConfig } from '../permissions.js'
 
 // Segnaposto dimostrativo per i documenti del cassetto (in demo è un data URL).
 const DEMO_DOC =
@@ -309,6 +310,20 @@ export async function deleteEmployeeDocument(docId) {
 
 export function subscribeToDocuments() {
   return () => {}
+}
+
+// --- Categorie & Permessi (configurazione) ---------------------------------
+
+export async function getPermissionsConfig() {
+  await delay(60)
+  return load().permConfig || defaultPermConfig()
+}
+
+export async function savePermissionsConfig(config) {
+  await delay()
+  const state = load()
+  state.permConfig = config
+  save(state)
 }
 
 // Solo per il prototipo: riporta i dati demo allo stato iniziale.

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { login, getFinesForEmployee, acknowledgeFine } from './data/api.js'
+import { login, getFinesForEmployee, acknowledgeFine, getPermissionsConfig } from './data/api.js'
+import { puo } from './permissions.js'
 import Welcome from './components/Welcome.jsx'
 import Hub from './components/Hub.jsx'
 import Login from './components/Login.jsx'
@@ -13,6 +14,7 @@ import Timbrature from './components/Timbrature.jsx'
 import TimbratureBoard from './components/TimbratureBoard.jsx'
 import CassettoDipendente from './components/CassettoDipendente.jsx'
 import PagheCassetti from './components/PagheCassetti.jsx'
+import PermessiPage from './components/PermessiPage.jsx'
 import FineNoticeModal from './components/FineNoticeModal.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
@@ -30,6 +32,8 @@ export default function App() {
   const [fineModalSeen, setFineModalSeen] = useState(false)
   const [ackBusy, setAckBusy] = useState(false)
   const [cassettoSub, setCassettoSub] = useState(null) // sotto-sezione iniziale del cassetto
+  // Configurazione categorie/permessi (decide la visibilità delle aree).
+  const [permConfig, setPermConfig] = useState(null)
 
   useEffect(() => {
     // Deep-link da QR: ?vehicle=ID → avvia la presa in carico di quel mezzo.
@@ -48,6 +52,12 @@ export default function App() {
     }
     setReady(true)
   }, [])
+
+  // Carica la configurazione categorie/permessi (e la ricarica al login, perché
+  // un amministratore può averla modificata da un altro dispositivo).
+  useEffect(() => {
+    getPermissionsConfig().then(setPermConfig).catch(() => {})
+  }, [user])
 
   // Carica le sanzioni del dipendente loggato (per badge, banner e modale).
   useEffect(() => {
@@ -142,6 +152,7 @@ export default function App() {
           onLogout={handleLogout}
           finesPending={unackFines.length}
           onOpenFines={openMulte}
+          permConfig={permConfig}
         />
         {fineModal}
       </>
@@ -158,12 +169,23 @@ export default function App() {
     )
   }
 
-  if (area === 'utenti' && user.role === 'admin') {
+  if (area === 'utenti' && puo(user, 'area.utenti', permConfig)) {
     return (
       <div className="app app-wide">
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
         <main className="content dashboard">
           <UsersAdmin admin={user} />
+        </main>
+      </div>
+    )
+  }
+
+  if (area === 'permessi' && puo(user, 'area.permessi', permConfig)) {
+    return (
+      <div className="app app-wide">
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
+        <main className="content dashboard">
+          <PermessiPage user={user} />
         </main>
       </div>
     )
@@ -196,7 +218,7 @@ export default function App() {
     )
   }
 
-  if (area === 'cassetti-paghe' && (user.role === 'paghe' || user.role === 'admin')) {
+  if (area === 'cassetti-paghe' && puo(user, 'cassetti.manage', permConfig)) {
     return (
       <div className="app app-wide">
         <Header user={user} onLogout={handleLogout} onBack={backToHub} />
