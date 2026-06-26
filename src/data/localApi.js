@@ -412,7 +412,7 @@ export function subscribeToVehicleData() {
 
 // --- Multe / Sanzioni ------------------------------------------------------
 
-export async function createFine({ vehicleId, employeeId, infractionAt, amount, place, type, verbale, note, recordedBy }) {
+export async function createFine({ vehicleId, employeeId, infractionAt, amount, place, type, verbale, note, attachmentUrl, recordedBy }) {
   await delay()
   const state = load()
   state.fines = state.fines || []
@@ -426,6 +426,7 @@ export async function createFine({ vehicleId, employeeId, infractionAt, amount, 
     type: type || '',
     verbale: verbale || '',
     note: (note || '').trim(),
+    attachmentUrl: attachmentUrl || null,
     status: 'registered',
     acknowledgedAt: null,
     contestedAt: null,

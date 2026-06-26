@@ -72,6 +72,9 @@ export default function EmployeeFines({ user, onChange }) {
                   {f.type && <div>📋 {f.type}</div>}
                   {f.place && <div>📍 {f.place}</div>}
                   {f.verbale && <div>N. verbale: {f.verbale}</div>}
+                  {f.attachmentUrl && (
+                    <div><a href={f.attachmentUrl} target="_blank" rel="noreferrer">📎 Vedi scansione del verbale</a></div>
+                  )}
                   {f.note && <div className="request-note">{f.note}</div>}
                 </div>
                 {f.status === 'contested' && (

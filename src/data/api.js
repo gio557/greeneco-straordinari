@@ -48,6 +48,8 @@ export const listVehicles = impl.listVehicles
 export const getVehicle = impl.getVehicle
 export const getOpenIssues = impl.getOpenIssues
 export const uploadVehiclePhoto = impl.uploadVehiclePhoto
+// La scansione della multa usa lo stesso meccanismo di upload delle foto mezzi.
+export const uploadFineScan = impl.uploadVehiclePhoto
 export const createHandover = impl.createHandover
 export const getActiveHandover = impl.getActiveHandover
 export const getOpenHandovers = impl.getOpenHandovers

@@ -446,6 +446,7 @@ create table if not exists public.vehicle_fines (
   type            text,
   verbale         text,
   note            text default '',
+  attachment_url  text,                       -- scansione del verbale (immagine/PDF)
   status          text not null default 'registered'
                     check (status in ('registered', 'acknowledged', 'contested', 'cancelled')),
   acknowledged_at timestamptz,
@@ -454,6 +455,9 @@ create table if not exists public.vehicle_fines (
   recorded_by     text references public.profiles (id),
   recorded_at     timestamptz not null default now()
 );
+
+-- Su DB già esistenti: aggiunge la colonna allegato (idempotente).
+alter table public.vehicle_fines add column if not exists attachment_url text;
 
 create index if not exists vehicle_fines_employee_idx on public.vehicle_fines (employee_id);
 create index if not exists vehicle_fines_vehicle_idx on public.vehicle_fines (vehicle_id);
