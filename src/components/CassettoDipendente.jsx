@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { puo } from '../permissions.js'
 import DocumentList from './DocumentList.jsx'
 import EmployeeFines from './EmployeeFines.jsx'
 
@@ -24,13 +25,15 @@ const TILES = [
 
 // Cassetto personale del dipendente: tre sezioni. Mostra SOLO i propri dati
 // (ogni sotto-vista interroga con il proprio user.id).
-export default function CassettoDipendente({ user, initialSub = null, onChangeFines }) {
+export default function CassettoDipendente({ user, initialSub = null, onChangeFines, permConfig = null }) {
+  const canSeeMulte = puo(user, 'multe.view_own', permConfig)
+  const tiles = TILES.filter((t) => t.key !== 'multe' || canSeeMulte)
   const [sub, setSub] = useState(initialSub)
   const back = (
     <button className="back-link" onClick={() => setSub(null)}>‹ Cassetto del dipendente</button>
   )
 
-  if (sub === 'multe') {
+  if (sub === 'multe' && canSeeMulte) {
     return (
       <>
         <div className="content sub-back">{back}</div>
@@ -51,7 +54,7 @@ export default function CassettoDipendente({ user, initialSub = null, onChangeFi
     <main className="content">
       <h2 className="section-title">Cassetto del dipendente</h2>
       <div className="cassetto-tiles">
-        {TILES.map((t) => (
+        {tiles.map((t) => (
           <button key={t.key} className="admin-tile" style={{ '--accent': t.accent }} onClick={() => setSub(t.key)}>
             <span className="admin-tile-ico"><t.Ico /></span>
             <span className="admin-tile-text">

@@ -11,11 +11,13 @@ import {
   createHandover,
 } from '../data/api.js'
 import { formatDateTime } from '../utils.js'
+import { puo } from '../permissions.js'
 import QrScanner, { qrScanSupported } from './QrScanner.jsx'
 
 // Flusso di presa in carico / riconsegna di un mezzo da parte del dipendente.
 // `vehicleId` (opzionale) arriva dal QR/deep-link e salta la selezione.
-export default function VehicleHandover({ user, vehicleId, onBack }) {
+export default function VehicleHandover({ user, vehicleId, onBack, permConfig = null }) {
+  const canHandover = puo(user, 'automezzi.handover', permConfig)
   const [vehicle, setVehicle] = useState(null)
   const [openIssues, setOpenIssues] = useState([])
   const [status, setStatus] = useState(null) // handover aperto o null (disponibile)
@@ -240,6 +242,12 @@ export default function VehicleHandover({ user, vehicleId, onBack }) {
           <button className="btn-primary btn-block big-confirm" disabled={submitting} onClick={doReturn}>
             {submitting ? 'Riconsegna…' : '↩ Riconsegna il mezzo'}
           </button>
+        </div>
+      ) : !canHandover ? (
+        // Categoria senza permesso di presa in carico: sola consultazione.
+        <div className="card preexist">
+          <p>La presa in carico dei mezzi non è abilitata per la tua categoria.</p>
+          <button className="btn-ghost btn-block" onClick={onBack} style={{ marginTop: 10 }}>Torna indietro</button>
         </div>
       ) : (
         // Disponibile: presa in carico con dichiarazione.

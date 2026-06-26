@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { adminListUsers, adminUpsertUser, adminDeleteUser, exportAllData, getPermissionsConfig } from '../data/api.js'
 import { downloadTextFile } from '../timesheet.js'
 import { initials } from '../utils.js'
+import { puo } from '../permissions.js'
 
 const ROLE_LABELS = { admin: 'Amministratore', manager: 'Manager', employee: 'Dipendente', paghe: 'Ufficio paghe' }
 const SECTION = {
@@ -37,10 +38,15 @@ export default function UsersAdmin({ admin }) {
   const [section, setSection] = useState(null) // null | 'managers' | 'employees' | 'admins'
   const [editing, setEditing] = useState(null) // null | 'new' | user
   const [exporting, setExporting] = useState(false)
-  const [categories, setCategories] = useState([])
+  const [permConfig, setPermConfig] = useState(null)
+  const categories = permConfig?.categories || []
+  const canCreate = puo(admin, 'profili.create', permConfig)
+  const canDelete = puo(admin, 'profili.delete', permConfig)
+  const canCategory = puo(admin, 'profili.category', permConfig)
+  const canBackup = puo(admin, 'backup.export', permConfig)
 
   useEffect(() => {
-    getPermissionsConfig().then((cfg) => setCategories(cfg.categories || [])).catch(() => {})
+    getPermissionsConfig().then(setPermConfig).catch(() => {})
   }, [])
 
   async function load() {
@@ -105,6 +111,7 @@ export default function UsersAdmin({ admin }) {
           managers={managers}
           employees={employees}
           categories={categories}
+          canCategory={canCategory}
           onCancel={() => setEditing(null)}
           onSaved={async () => { setEditing(null); await load() }}
         />
@@ -120,7 +127,9 @@ export default function UsersAdmin({ admin }) {
         <button className="back-link" onClick={() => setSection(null)}>‹ Torna alla gestione utenti</button>
         <div className="dash-filters">
           <h2 className="section-title">{SECTION[section].title}</h2>
-          <button className="btn-primary btn-sm" onClick={() => setEditing('new')}>+ Nuovo {SECTION[section].singular}</button>
+          {canCreate && (
+            <button className="btn-primary btn-sm" onClick={() => setEditing('new')}>+ Nuovo {SECTION[section].singular}</button>
+          )}
         </div>
         {error && <p className="error">{error}</p>}
         {loading ? (
@@ -156,10 +165,13 @@ export default function UsersAdmin({ admin }) {
                         : <span className="badge badge-rejected">assente</span>}
                     </td>
                     <td data-label="Azioni" className="actions-col">
-                      <button className="btn-ghost btn-sm" onClick={() => setEditing(u)}>Modifica</button>
-                      {u.id !== admin.id && (
+                      {canCreate && (
+                        <button className="btn-ghost btn-sm" onClick={() => setEditing(u)}>Modifica</button>
+                      )}
+                      {canDelete && u.id !== admin.id && (
                         <button className="btn-ghost btn-sm danger" onClick={() => remove(u)}>Elimina</button>
                       )}
+                      {!canCreate && !canDelete && <span className="muted small">—</span>}
                     </td>
                   </tr>
                 ))}
@@ -222,13 +234,15 @@ export default function UsersAdmin({ admin }) {
         La password è salvata cifrata; lasciala vuota in modifica per non cambiarla.
       </p>
 
-      <div className="backup-box">
-        <h3 className="mini-title">Backup dati</h3>
-        <p className="muted small">Scarica una copia di sicurezza di tutti i dati in un file JSON (password escluse).</p>
-        <button className="btn-ghost" onClick={exportBackup} disabled={exporting}>
-          {exporting ? 'Esportazione…' : '⬇ Esporta backup completo (JSON)'}
-        </button>
-      </div>
+      {canBackup && (
+        <div className="backup-box">
+          <h3 className="mini-title">Backup dati</h3>
+          <p className="muted small">Scarica una copia di sicurezza di tutti i dati in un file JSON (password escluse).</p>
+          <button className="btn-ghost" onClick={exportBackup} disabled={exporting}>
+            {exporting ? 'Esportazione…' : '⬇ Esporta backup completo (JSON)'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -243,7 +257,7 @@ function teamCount(managerId, employees) {
   return n === 0 ? '—' : `${n}`
 }
 
-function UserForm({ admin, role, user, managers, employees, categories = [], onCancel, onSaved }) {
+function UserForm({ admin, role, user, managers, employees, categories = [], canCategory = true, onCancel, onSaved }) {
   const isNew = !user
   const [form, setForm] = useState({
     id: user?.id ?? '',
@@ -326,14 +340,18 @@ function UserForm({ admin, role, user, managers, employees, categories = [], onC
         </label>
         <label className="field">
           <span className="field-label">Reparto / categoria</span>
-          <select className="input" value={form.department} onChange={(e) => set('department', e.target.value)}>
+          <select className="input" value={form.department} onChange={(e) => set('department', e.target.value)} disabled={!canCategory}>
             <option value="">— Nessuno —</option>
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             {form.department && !categories.includes(form.department) && (
               <option value={form.department}>{form.department} (non più in elenco)</option>
             )}
           </select>
-          <span className="field-hint">Determina cosa l'utente può vedere e fare (Categorie &amp; Permessi).</span>
+          <span className="field-hint">
+            {canCategory
+              ? "Determina cosa l'utente può vedere e fare (Categorie & Permessi)."
+              : 'Non hai il permesso di cambiare la categoria di un utente.'}
+          </span>
         </label>
         <label className="field">
           <span className="field-label">Email</span>
