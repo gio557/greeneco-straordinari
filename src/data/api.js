@@ -53,6 +53,7 @@ export const getActiveHandover = impl.getActiveHandover
 export const getOpenHandovers = impl.getOpenHandovers
 export const returnVehicle = impl.returnVehicle
 export const getRecentHandovers = impl.getRecentHandovers
+export const getHandoverAt = impl.getHandoverAt
 export const getAllIssues = impl.getAllIssues
 export const resolveIssue = impl.resolveIssue
 export const adminListVehicles = impl.adminListVehicles

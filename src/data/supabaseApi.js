@@ -389,6 +389,25 @@ export async function createHandover({ vehicleId, employeeId, note, issues }) {
   return rowToHandover(data)
 }
 
+// Passaggio di consegna attivo per quel mezzo a una certa data (per attribuire
+// una multa anche di mesi prima): query mirata sul singolo mezzo, senza limiti
+// di profondità sullo storico complessivo.
+export async function getHandoverAt(vehicleId, atISO) {
+  const { data, error } = await supabase
+    .from('vehicle_handovers')
+    .select('*')
+    .eq('vehicle_id', vehicleId)
+    .lte('taken_at', atISO)
+    .order('taken_at', { ascending: false })
+    .limit(5)
+  if (error) throw new Error(error.message)
+  const t = Date.parse(atISO)
+  const match = (data || [])
+    .map(rowToHandover)
+    .find((h) => !h.returnedAt || Date.parse(h.returnedAt) >= t)
+  return match || null
+}
+
 export async function getRecentHandovers(limit = 200) {
   const { data, error } = await supabase
     .from('vehicle_handovers')

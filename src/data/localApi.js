@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { USERS, REQUESTS, CREDENTIALS, VEHICLES } from './seed.js'
+import { findHandoverAt } from '../fines.js'
 
 const STORAGE_KEY = 'straordinari_state_v4'
 
@@ -342,6 +343,13 @@ export async function getRecentHandovers(limit = 200) {
     .handovers.slice()
     .sort((a, b) => b.takenAt.localeCompare(a.takenAt))
     .slice(0, limit)
+}
+
+// Passaggio di consegna attivo per quel mezzo a una certa data (per attribuire
+// una multa anche di mesi prima): query mirata, senza limiti di profondità.
+export async function getHandoverAt(vehicleId, atISO) {
+  await delay(60)
+  return findHandoverAt(load().handovers, vehicleId, atISO)
 }
 
 export async function getAllIssues() {
