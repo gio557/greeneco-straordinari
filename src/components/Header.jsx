@@ -5,6 +5,7 @@ const ROLE_LABELS = {
   admin: 'Amministratore',
   manager: 'Manager',
   employee: 'Dipendente',
+  paghe: 'Ufficio paghe',
 }
 
 export default function Header({ user, onLogout, onBack, finesCount = 0 }) {

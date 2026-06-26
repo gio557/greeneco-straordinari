@@ -24,6 +24,13 @@ export const USERS = [
     email: 'marco.verdi@azienda.it',
   },
   {
+    id: 'paghe-1',
+    name: 'Ufficio Paghe',
+    role: 'paghe',
+    department: 'Amministrazione',
+    email: 'paghe@azienda.it',
+  },
+  {
     id: 'emp-1',
     name: 'Giulia Rossi',
     role: 'employee',
@@ -56,6 +63,7 @@ export const CREDENTIALS = {
   admin: 'admin123',
   'mgr-1': 'demo123',
   'mgr-2': 'demo123',
+  'paghe-1': 'demo123',
   'emp-1': 'demo123',
   'emp-2': 'demo123',
   'emp-3': 'demo123',

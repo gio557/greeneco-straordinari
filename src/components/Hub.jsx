@@ -14,8 +14,27 @@ function PeopleIcon() {
   )
 }
 
+function DrawerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <path d="M3.5 10.5h17" /><path d="M10 13.8h4" />
+    </svg>
+  )
+}
+function DocsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8 3h6l4 4v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M14 3v4h4" /><path d="M9.5 12h5M9.5 15h3" />
+    </svg>
+  )
+}
+
 // Hub delle aree: dopo l'accesso, l'utente sceglie in quale macro-area entrare.
-export default function Hub({ onSelect, user, onLogout, finesPending = 0, finesTotal = 0, onOpenFines }) {
+export default function Hub({ onSelect, user, onLogout, finesPending = 0, onOpenFines }) {
   return (
     <div className="hub">
       {user && (
@@ -39,13 +58,6 @@ export default function Hub({ onSelect, user, onLogout, finesPending = 0, finesT
           <span className="area-arrow" aria-hidden>›</span>
         </button>
       )}
-      {finesPending === 0 && finesTotal > 0 && (
-        <button className="hub-fine-link" onClick={onOpenFines}>
-          <span aria-hidden>📋</span>
-          <span>Le mie sanzioni{finesTotal > 1 ? ` (${finesTotal})` : ''}</span>
-          <span className="area-arrow" aria-hidden>›</span>
-        </button>
-      )}
       <div className="login-brand">
         <img className="login-logo" src="./greeneco-logo.jpeg" alt="greeneco wastewater" />
         <h1>Operations</h1>
@@ -53,6 +65,26 @@ export default function Hub({ onSelect, user, onLogout, finesPending = 0, finesT
       </div>
 
       <div className="hub-grid">
+        {user?.role === 'employee' && (
+          <button className="area-card" style={{ '--accent': '#0d3b66' }} onClick={() => onSelect('cassetto')}>
+            <span className="area-icon"><DrawerIcon /></span>
+            <span className="area-text">
+              <span className="area-title">Cassetto del dipendente</span>
+              <span className="area-sub">Cedolini, multe e sanzioni disciplinari</span>
+            </span>
+            <span className="area-arrow" aria-hidden>›</span>
+          </button>
+        )}
+        {(user?.role === 'paghe' || user?.role === 'admin') && (
+          <button className="area-card" style={{ '--accent': '#2e9e5b' }} onClick={() => onSelect('cassetti-paghe')}>
+            <span className="area-icon"><DocsIcon /></span>
+            <span className="area-text">
+              <span className="area-title">Cassetti dei dipendenti</span>
+              <span className="area-sub">Carica cedolini e sanzioni disciplinari (ufficio paghe)</span>
+            </span>
+            <span className="area-arrow" aria-hidden>›</span>
+          </button>
+        )}
         {AREAS.map((area) => (
           <button
             key={area.id}

@@ -3,11 +3,12 @@ import { adminListUsers, adminUpsertUser, adminDeleteUser, exportAllData } from 
 import { downloadTextFile } from '../timesheet.js'
 import { initials } from '../utils.js'
 
-const ROLE_LABELS = { admin: 'Amministratore', manager: 'Manager', employee: 'Dipendente' }
+const ROLE_LABELS = { admin: 'Amministratore', manager: 'Manager', employee: 'Dipendente', paghe: 'Ufficio paghe' }
 const SECTION = {
   managers: { role: 'manager', title: 'Gestione manager', singular: 'manager' },
   employees: { role: 'employee', title: 'Gestione dipendenti', singular: 'dipendente' },
   admins: { role: 'admin', title: 'Amministratori', singular: 'amministratore' },
+  paghe: { role: 'paghe', title: 'Ufficio paghe', singular: 'utente ufficio paghe' },
 }
 
 const svgProps = {
@@ -22,6 +23,9 @@ function IcoPeople() {
 }
 function IcoShield() {
   return <svg {...svgProps}><path d="M12 3l7 2.6v5c0 4.3-3 7.3-7 8.8-4-1.5-7-4.5-7-8.8v-5z" /><path d="M9.2 12l1.9 1.9L15 10" /></svg>
+}
+function IcoBriefcase() {
+  return <svg {...svgProps}><rect x="3.5" y="7.5" width="17" height="12" rx="2" /><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5" /><path d="M3.5 12h17" /></svg>
 }
 
 // Amministrazione utenti: tre ingressi (manager, dipendenti, amministratori).
@@ -54,7 +58,8 @@ export default function UsersAdmin({ admin }) {
   const managers = useMemo(() => users.filter((u) => u.role === 'manager'), [users])
   const employees = useMemo(() => users.filter((u) => u.role === 'employee'), [users])
   const admins = useMemo(() => users.filter((u) => u.role === 'admin'), [users])
-  const byRole = { managers, employees, admins }
+  const paghe = useMemo(() => users.filter((u) => u.role === 'paghe'), [users])
+  const byRole = { managers, employees, admins, paghe }
 
   async function exportBackup() {
     setExporting(true)
@@ -185,15 +190,26 @@ export default function UsersAdmin({ admin }) {
           <span className="admin-tile-arrow" aria-hidden>›</span>
         </button>
       </div>
-      <button className="admin-tile admin-tile-sm" style={{ '--accent': '#b7791f' }} onClick={() => setSection('admins')}>
-        <span className="admin-tile-ico"><IcoShield /></span>
-        <span className="admin-tile-text">
-          <span className="admin-tile-title">Amministratori</span>
-          <span className="admin-tile-sub">Gestisci gli account amministratore</span>
-        </span>
-        <span className="admin-tile-count">{admins.length}</span>
-        <span className="admin-tile-arrow" aria-hidden>›</span>
-      </button>
+      <div className="admin-tiles">
+        <button className="admin-tile admin-tile-sm" style={{ '--accent': '#b7791f' }} onClick={() => setSection('admins')}>
+          <span className="admin-tile-ico"><IcoShield /></span>
+          <span className="admin-tile-text">
+            <span className="admin-tile-title">Amministratori</span>
+            <span className="admin-tile-sub">Gestisci gli account amministratore</span>
+          </span>
+          <span className="admin-tile-count">{admins.length}</span>
+          <span className="admin-tile-arrow" aria-hidden>›</span>
+        </button>
+        <button className="admin-tile admin-tile-sm" style={{ '--accent': '#1f7a8c' }} onClick={() => setSection('paghe')}>
+          <span className="admin-tile-ico"><IcoBriefcase /></span>
+          <span className="admin-tile-text">
+            <span className="admin-tile-title">Ufficio paghe</span>
+            <span className="admin-tile-sub">Account che gestiscono i cassetti dei dipendenti</span>
+          </span>
+          <span className="admin-tile-count">{paghe.length}</span>
+          <span className="admin-tile-arrow" aria-hidden>›</span>
+        </button>
+      </div>
 
       <p className="login-hint">
         L'ID identifica l'utente per l'accesso e non è modificabile dopo la creazione.

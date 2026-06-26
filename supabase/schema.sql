@@ -43,7 +43,7 @@ create table if not exists public.profiles (
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles
   add constraint profiles_role_check
-  check (role in ('employee', 'manager', 'admin'));
+  check (role in ('employee', 'manager', 'admin', 'paghe'));
 
 -- Manager del dipendente: relazione MOLTI-A-MOLTI (un dipendente può avere più
 -- manager). Si usa una colonna array; il vecchio singolo manager_id resta per
@@ -255,7 +255,7 @@ begin
     raise exception 'ID e nome sono obbligatori';
   end if;
 
-  if p_role not in ('employee', 'manager', 'admin') then
+  if p_role not in ('employee', 'manager', 'admin', 'paghe') then
     raise exception 'Ruolo non valido';
   end if;
 
@@ -511,6 +511,59 @@ create policy "fine_scans_insert" on storage.objects for insert to anon, authent
 drop policy if exists "fine_scans_select" on storage.objects;
 create policy "fine_scans_select" on storage.objects for select to anon, authenticated
   using (bucket_id = 'fine-scans');
+
+-- ===========================================================================
+-- CASSETTO DEL DIPENDENTE: documenti personali (cedolini, sanzioni disciplinari)
+-- gestiti dall'ufficio paghe. Le multe restano in vehicle_fines.
+-- Ogni documento è legato a UN dipendente (employee_id). L'app legge SEMPRE
+-- filtrando per employee_id del dipendente loggato: un documento non può quindi
+-- comparire nel cassetto di un'altra persona. La protezione forte a livello di
+-- database (RLS su auth.uid) arriverà con il login reale.
+-- ===========================================================================
+create table if not exists public.employee_documents (
+  id              text primary key,
+  employee_id     text not null references public.profiles (id) on delete cascade,
+  kind            text not null check (kind in ('cedolino', 'disciplinare')),
+  title           text,
+  doc_date        date,
+  attachment_path text,
+  needs_ack       boolean not null default false,
+  acknowledged_at timestamptz,
+  uploaded_by     text references public.profiles (id),
+  created_at      timestamptz not null default now()
+);
+create index if not exists employee_documents_employee_idx on public.employee_documents (employee_id);
+
+alter table public.employee_documents enable row level security;
+drop policy if exists "docs_select_anon" on public.employee_documents;
+create policy "docs_select_anon" on public.employee_documents for select to anon, authenticated using (true);
+drop policy if exists "docs_insert_anon" on public.employee_documents;
+create policy "docs_insert_anon" on public.employee_documents for insert to anon, authenticated with check (true);
+drop policy if exists "docs_update_anon" on public.employee_documents;
+create policy "docs_update_anon" on public.employee_documents for update to anon, authenticated using (true) with check (true);
+drop policy if exists "docs_delete_anon" on public.employee_documents;
+create policy "docs_delete_anon" on public.employee_documents for delete to anon, authenticated using (true);
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='employee_documents') then
+    alter publication supabase_realtime add table public.employee_documents;
+  end if;
+end $$;
+
+-- Bucket PRIVATO per i documenti del cassetto (accesso solo via URL firmati).
+insert into storage.buckets (id, name, public)
+  values ('employee-docs', 'employee-docs', false)
+  on conflict (id) do update set public = false;
+drop policy if exists "emp_docs_insert" on storage.objects;
+create policy "emp_docs_insert" on storage.objects for insert to anon, authenticated
+  with check (bucket_id = 'employee-docs');
+drop policy if exists "emp_docs_select" on storage.objects;
+create policy "emp_docs_select" on storage.objects for select to anon, authenticated
+  using (bucket_id = 'employee-docs');
+drop policy if exists "emp_docs_delete" on storage.objects;
+create policy "emp_docs_delete" on storage.objects for delete to anon, authenticated
+  using (bucket_id = 'employee-docs');
 
 -- Funzioni admin per l'anagrafica mezzi.
 create or replace function public.admin_upsert_vehicle(

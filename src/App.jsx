@@ -11,7 +11,8 @@ import VehicleHandover from './components/VehicleHandover.jsx'
 import VehiclesDashboard from './components/VehiclesDashboard.jsx'
 import Timbrature from './components/Timbrature.jsx'
 import TimbratureBoard from './components/TimbratureBoard.jsx'
-import EmployeeFines from './components/EmployeeFines.jsx'
+import CassettoDipendente from './components/CassettoDipendente.jsx'
+import PagheCassetti from './components/PagheCassetti.jsx'
 import FineNoticeModal from './components/FineNoticeModal.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
@@ -28,6 +29,7 @@ export default function App() {
   const [fines, setFines] = useState([])
   const [fineModalSeen, setFineModalSeen] = useState(false)
   const [ackBusy, setAckBusy] = useState(false)
+  const [cassettoSub, setCassettoSub] = useState(null) // sotto-sezione iniziale del cassetto
 
   useEffect(() => {
     // Deep-link da QR: ?vehicle=ID → avvia la presa in carico di quel mezzo.
@@ -74,10 +76,17 @@ export default function App() {
     setPendingVehicle(null)
     setFines([])
     setFineModalSeen(false)
+    setCassettoSub(null)
   }
 
   function backToHub() {
     setArea(null)
+    setCassettoSub(null)
+  }
+
+  function openMulte() {
+    setCassettoSub('multe')
+    setArea('cassetto')
   }
 
   if (!ready) return null
@@ -104,7 +113,7 @@ export default function App() {
           setAckBusy(false)
           setFineModalSeen(true)
         }}
-        onOpenDetails={() => { setFineModalSeen(true); setArea('sanzioni') }}
+        onOpenDetails={() => { setFineModalSeen(true); openMulte() }}
         onClose={() => setFineModalSeen(true)}
       />
     ) : null
@@ -132,8 +141,7 @@ export default function App() {
           user={user}
           onLogout={handleLogout}
           finesPending={unackFines.length}
-          finesTotal={fines.length}
-          onOpenFines={() => setArea('sanzioni')}
+          onOpenFines={openMulte}
         />
         {fineModal}
       </>
@@ -179,11 +187,20 @@ export default function App() {
     )
   }
 
-  if (area === 'sanzioni') {
+  if (area === 'cassetto') {
     return (
       <div className="app">
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
-        <EmployeeFines user={user} onChange={reloadFines} />
+        <CassettoDipendente user={user} initialSub={cassettoSub} onChangeFines={reloadFines} />
+      </div>
+    )
+  }
+
+  if (area === 'cassetti-paghe' && (user.role === 'paghe' || user.role === 'admin')) {
+    return (
+      <div className="app app-wide">
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} />
+        <PagheCassetti user={user} />
       </div>
     )
   }

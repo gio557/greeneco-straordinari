@@ -73,6 +73,15 @@ export const contestFine = impl.contestFine
 export const cancelFine = impl.cancelFine
 export const subscribeToFines = impl.subscribeToFines
 
+// Cassetto del Dipendente: documenti personali (cedolini, sanzioni disciplinari)
+export const uploadDocFile = impl.uploadDocFile
+export const getDocFileUrl = impl.getDocFileUrl
+export const createEmployeeDocument = impl.createEmployeeDocument
+export const getEmployeeDocuments = impl.getEmployeeDocuments
+export const acknowledgeDocument = impl.acknowledgeDocument
+export const deleteEmployeeDocument = impl.deleteEmployeeDocument
+export const subscribeToDocuments = impl.subscribeToDocuments
+
 // Timbrature presenze (con buffer di sicurezza in modalità Supabase)
 export const getLastClocking = clk.getLastClocking
 export const getMyClockings = clk.getMyClockings

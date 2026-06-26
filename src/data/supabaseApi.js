@@ -747,6 +747,99 @@ export function subscribeToClockings(onChange) {
 }
 
 // ===========================================================================
+// CASSETTO DEL DIPENDENTE: documenti personali (cedolini, sanzioni disciplinari)
+// ===========================================================================
+
+function rowToDocument(d) {
+  return {
+    id: d.id,
+    employeeId: d.employee_id,
+    kind: d.kind,
+    title: d.title ?? '',
+    docDate: d.doc_date,
+    attachmentPath: d.attachment_path,
+    needsAck: d.needs_ack,
+    acknowledgedAt: d.acknowledged_at,
+    uploadedBy: d.uploaded_by,
+    createdAt: d.created_at,
+  }
+}
+
+// Carica il file del documento nel bucket PRIVATO `employee-docs` e ritorna il
+// PATH (l'URL firmato si genera alla lettura).
+export async function uploadDocFile(file) {
+  const ext = (file.name?.split('.').pop() || 'bin').toLowerCase()
+  const path = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const { error } = await supabase.storage
+    .from('employee-docs')
+    .upload(path, file, { contentType: file.type || 'application/octet-stream' })
+  if (error) throw new Error(error.message)
+  return path
+}
+
+export async function getDocFileUrl(value) {
+  if (!value) return null
+  if (/^(https?:|data:)/i.test(value)) return value
+  const { data, error } = await supabase.storage.from('employee-docs').createSignedUrl(value, 3600)
+  if (error) return null
+  return data?.signedUrl || null
+}
+
+export async function createEmployeeDocument({ employeeId, kind, title, docDate, attachmentPath, needsAck, uploadedBy }) {
+  const { data, error } = await supabase
+    .from('employee_documents')
+    .insert({
+      id: `doc-${Date.now()}`,
+      employee_id: employeeId,
+      kind,
+      title: (title || '').trim() || null,
+      doc_date: docDate || null,
+      attachment_path: attachmentPath || null,
+      needs_ack: !!needsAck,
+      uploaded_by: uploadedBy || null,
+    })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return rowToDocument(data)
+}
+
+// Documenti di UN dipendente (filtro privacy: sempre per employee_id).
+export async function getEmployeeDocuments(employeeId, kind) {
+  if (!employeeId) return []
+  let q = supabase.from('employee_documents').select('*').eq('employee_id', employeeId)
+  if (kind) q = q.eq('kind', kind)
+  const { data, error } = await q.order('doc_date', { ascending: false, nullsFirst: false })
+  if (error) throw new Error(error.message)
+  return data.map(rowToDocument)
+}
+
+export async function acknowledgeDocument(docId, employeeId) {
+  const { error } = await supabase
+    .from('employee_documents')
+    .update({ acknowledged_at: new Date().toISOString() })
+    .eq('id', docId)
+    .eq('employee_id', employeeId)
+    .is('acknowledged_at', null)
+  if (error) throw new Error(error.message)
+}
+
+export async function deleteEmployeeDocument(docId) {
+  const { error } = await supabase.from('employee_documents').delete().eq('id', docId)
+  if (error) throw new Error(error.message)
+}
+
+export function subscribeToDocuments(onChange) {
+  const channel = supabase
+    .channel('employee_documents_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_documents' }, onChange)
+    .subscribe()
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+// ===========================================================================
 // BACKUP / ESPORTAZIONE DATI (admin)
 // ===========================================================================
 

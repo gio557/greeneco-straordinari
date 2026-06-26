@@ -9,6 +9,14 @@
 
 import { USERS, REQUESTS, CREDENTIALS, VEHICLES } from './seed.js'
 import { findHandoverAt } from '../fines.js'
+import { filterDocuments } from '../documents.js'
+
+// Segnaposto dimostrativo per i documenti del cassetto (in demo è un data URL).
+const DEMO_DOC =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="380" height="500"><rect width="380" height="500" fill="#ffffff" stroke="#cccccc"/><rect width="380" height="48" fill="#0d3b66"/><text x="16" y="31" fill="#fff" font-family="sans-serif" font-size="16">GREENECO — Documento</text><text x="16" y="92" font-family="sans-serif" font-size="13">(documento dimostrativo)</text></svg>'
+  )
 
 const STORAGE_KEY = 'straordinari_state_v4'
 
@@ -47,6 +55,11 @@ function load() {
         recordedBy: 'admin',
         recordedAt: '2026-06-24T09:00:00+02:00',
       },
+    ],
+    // Documenti dimostrativi del cassetto per emp-1.
+    documents: [
+      { id: 'doc-demo-1', employeeId: 'emp-1', kind: 'cedolino', title: 'Cedolino maggio 2026', docDate: '2026-05-31', attachmentPath: DEMO_DOC, needsAck: false, acknowledgedAt: null, uploadedBy: 'paghe-1', createdAt: '2026-06-02T09:00:00+02:00' },
+      { id: 'doc-demo-2', employeeId: 'emp-1', kind: 'disciplinare', title: 'Richiamo verbale', docDate: '2026-04-10', attachmentPath: DEMO_DOC, needsAck: true, acknowledgedAt: null, uploadedBy: 'paghe-1', createdAt: '2026-04-11T09:00:00+02:00' },
     ],
   }
   save(initial)
@@ -240,6 +253,62 @@ export async function adminDeleteUser(adminId, userId) {
   state.users = state.users.filter((u) => u.id !== userId)
   if (state.passwords) delete state.passwords[userId]
   save(state)
+}
+
+// --- Cassetto del Dipendente: documenti personali --------------------------
+
+export async function uploadDocFile(file) {
+  return uploadVehiclePhoto(file) // in demo: data URL locale
+}
+export async function getDocFileUrl(value) {
+  return value || null
+}
+
+export async function createEmployeeDocument({ employeeId, kind, title, docDate, attachmentPath, needsAck, uploadedBy }) {
+  await delay()
+  const state = load()
+  state.documents = state.documents || []
+  const doc = {
+    id: `doc-${Date.now()}`,
+    employeeId,
+    kind,
+    title: (title || '').trim() || '',
+    docDate: docDate || null,
+    attachmentPath: attachmentPath || null,
+    needsAck: !!needsAck,
+    acknowledgedAt: null,
+    uploadedBy: uploadedBy || null,
+    createdAt: new Date().toISOString(),
+  }
+  state.documents.push(doc)
+  save(state)
+  return doc
+}
+
+export async function getEmployeeDocuments(employeeId, kind) {
+  await delay(80)
+  return filterDocuments(load().documents || [], employeeId, kind)
+}
+
+export async function acknowledgeDocument(docId, employeeId) {
+  await delay()
+  const state = load()
+  const d = (state.documents || []).find((x) => x.id === docId && x.employeeId === employeeId)
+  if (d && !d.acknowledgedAt) {
+    d.acknowledgedAt = new Date().toISOString()
+    save(state)
+  }
+}
+
+export async function deleteEmployeeDocument(docId) {
+  await delay()
+  const state = load()
+  state.documents = (state.documents || []).filter((d) => d.id !== docId)
+  save(state)
+}
+
+export function subscribeToDocuments() {
+  return () => {}
 }
 
 // Solo per il prototipo: riporta i dati demo allo stato iniziale.

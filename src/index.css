@@ -1090,6 +1090,36 @@ button:disabled {
 .check-name code { color: var(--muted); font-size: 11.5px; }
 .avatar-sm { width: 30px; height: 30px; font-size: 12px; }
 
+/* ---------- Cassetto del dipendente / Ufficio paghe ---------- */
+.cassetto-tiles { display: flex; flex-direction: column; gap: 12px; }
+.cassetto-tiles .admin-tile { flex: none; width: 100%; }
+
+.emp-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--line);
+}
+.emp-pick:hover { box-shadow: 0 4px 14px rgba(13, 59, 102, 0.12); }
+.emp-pick-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.emp-pick-name { font-weight: 600; }
+.emp-pick .area-arrow { margin-left: auto; color: var(--muted); font-size: 20px; }
+
+.drawer-head { display: flex; align-items: center; gap: 10px; margin: 6px 0 14px; }
+.drawer-section { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.drawer-section .mini-title { margin-top: 0; }
+.drawer-form {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+.content.sub-back { padding-bottom: 0; }
+
 /* --- Filtri --- */
 .dash-filters {
   display: flex;
