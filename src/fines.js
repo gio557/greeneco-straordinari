@@ -7,6 +7,15 @@ export const FINE_STATUS = {
   cancelled: { label: 'Annullata', cls: 'badge-muted' },
 }
 
+// Vero se l'allegato è un'immagine (per mostrarne l'anteprima). Riconosce data
+// URL immagine e path/URL con estensione immagine.
+export function isImageAttachment(value) {
+  if (!value) return false
+  if (/^data:image\//i.test(value)) return true
+  const clean = String(value).split('?')[0].toLowerCase()
+  return /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/.test(clean)
+}
+
 export function formatEuro(n) {
   if (n == null || n === '') return '—'
   return '€ ' + Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

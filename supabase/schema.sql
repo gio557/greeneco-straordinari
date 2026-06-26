@@ -477,6 +477,21 @@ begin
   end if;
 end $$;
 
+-- Bucket PRIVATO per le scansioni dei verbali (dati personali): l'accesso avviene
+-- solo tramite URL firmati a scadenza generati dall'app. Il bucket viene creato
+-- qui se non esiste; le policy consentono caricamento e lettura con chiave anon
+-- (coerente con il prototipo), limitatamente a questo bucket.
+insert into storage.buckets (id, name, public)
+  values ('fine-scans', 'fine-scans', false)
+  on conflict (id) do update set public = false;
+
+drop policy if exists "fine_scans_insert" on storage.objects;
+create policy "fine_scans_insert" on storage.objects for insert to anon, authenticated
+  with check (bucket_id = 'fine-scans');
+drop policy if exists "fine_scans_select" on storage.objects;
+create policy "fine_scans_select" on storage.objects for select to anon, authenticated
+  using (bucket_id = 'fine-scans');
+
 -- Funzioni admin per l'anagrafica mezzi.
 create or replace function public.admin_upsert_vehicle(
   p_admin_id   text,

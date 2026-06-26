@@ -961,6 +961,15 @@ button:disabled {
 .fine-meta { font-size: 13px; color: var(--text); display: flex; flex-direction: column; gap: 2px; }
 .fine-meta .muted { color: var(--muted); }
 
+.fine-attach { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; }
+.fine-scan-thumb {
+  max-width: 160px;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  display: block;
+}
+
 /* Finestra modale (registrazione multa, avviso sanzioni). */
 .modal-overlay {
   position: fixed;

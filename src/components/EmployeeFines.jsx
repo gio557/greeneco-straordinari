@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { getFinesForEmployee, listVehicles, acknowledgeFine, contestFine, subscribeToFines } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
+import { useFineAttachments } from '../data/useFineAttachments.js'
 import { formatDateTime } from '../utils.js'
 import { FINE_STATUS, formatEuro } from '../fines.js'
+import FineAttachment from './FineAttachment.jsx'
 
 // Vista del dipendente: le proprie sanzioni, con presa visione e contestazione.
 export default function EmployeeFines({ user, onChange }) {
@@ -23,6 +25,7 @@ export default function EmployeeFines({ user, onChange }) {
   }
 
   useLiveData(refresh, [user.id], subscribeToFines)
+  const attachUrls = useFineAttachments(fines)
 
   const vname = (id) => vehicles[id]?.name || id || '—'
 
@@ -72,9 +75,7 @@ export default function EmployeeFines({ user, onChange }) {
                   {f.type && <div>📋 {f.type}</div>}
                   {f.place && <div>📍 {f.place}</div>}
                   {f.verbale && <div>N. verbale: {f.verbale}</div>}
-                  {f.attachmentUrl && (
-                    <div><a href={f.attachmentUrl} target="_blank" rel="noreferrer">📎 Vedi scansione del verbale</a></div>
-                  )}
+                  {f.attachmentUrl && <FineAttachment value={f.attachmentUrl} url={attachUrls[f.id]} />}
                   {f.note && <div className="request-note">{f.note}</div>}
                 </div>
                 {f.status === 'contested' && (

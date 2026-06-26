@@ -3,8 +3,10 @@ import {
   listVehicles, getUserMap, getAllFines, getHandoverAt, createFine, cancelFine, subscribeToFines, uploadFineScan,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
+import { useFineAttachments } from '../data/useFineAttachments.js'
 import { formatDateTime } from '../utils.js'
 import { FINE_STATUS, formatEuro } from '../fines.js'
+import FineAttachment from './FineAttachment.jsx'
 
 // Gestione sanzioni per manager/admin: registrazione (con attribuzione proposta
 // dal passaggio di consegna attivo alla data dell'infrazione) ed elenco.
@@ -23,6 +25,7 @@ export default function VehicleFines({ user }) {
   }
 
   useLiveData(refresh, [user.id], subscribeToFines)
+  const attachUrls = useFineAttachments(fines)
 
   const inScope = (employeeId) => isAdmin || userMap[employeeId]?.managerId === user.id
   const visible = useMemo(() => fines.filter((f) => inScope(f.employeeId)), [fines, userMap]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -79,7 +82,7 @@ export default function VehicleFines({ user }) {
                   <div>📅 {formatDateTime(f.infractionAt)}{f.type ? ` · ${f.type}` : ''}</div>
                   {f.place && <div>📍 {f.place}</div>}
                   {f.verbale && <div>N. verbale: {f.verbale}</div>}
-                  {f.attachmentUrl && <div><a href={f.attachmentUrl} target="_blank" rel="noreferrer">📎 Scansione verbale</a></div>}
+                  {f.attachmentUrl && <FineAttachment value={f.attachmentUrl} url={attachUrls[f.id]} />}
                   {f.acknowledgedAt && <div className="muted small">Presa visione: {formatDateTime(f.acknowledgedAt)}</div>}
                   {f.status === 'contested' && <div className="request-note">Contestazione: {f.contestNote || '(senza nota)'}</div>}
                 </div>

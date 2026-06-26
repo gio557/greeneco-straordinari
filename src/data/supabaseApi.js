@@ -584,6 +584,28 @@ export function subscribeToFines(onChange) {
   }
 }
 
+// Carica la scansione del verbale nel bucket PRIVATO e restituisce il PATH
+// dell'oggetto (non un URL pubblico): l'URL firmato si genera alla lettura.
+export async function uploadFineScan(file) {
+  const ext = (file.name?.split('.').pop() || 'bin').toLowerCase()
+  const path = `fine-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const { error } = await supabase.storage
+    .from('fine-scans')
+    .upload(path, file, { contentType: file.type || 'application/octet-stream' })
+  if (error) throw new Error(error.message)
+  return path
+}
+
+// Genera un URL firmato a scadenza per visualizzare la scansione. Gestisce anche
+// eventuali valori storici (vecchi URL pubblici o data URL) restituendoli così.
+export async function getFineScanUrl(value) {
+  if (!value) return null
+  if (/^(https?:|data:)/i.test(value)) return value
+  const { data, error } = await supabase.storage.from('fine-scans').createSignedUrl(value, 3600)
+  if (error) return null
+  return data?.signedUrl || null
+}
+
 // ===========================================================================
 // TIMBRATURE PRESENZE (prototipo)
 // ===========================================================================

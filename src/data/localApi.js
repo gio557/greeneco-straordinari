@@ -488,6 +488,16 @@ export function subscribeToFines() {
   return () => {}
 }
 
+// In demo la scansione è tenuta come data URL locale (come le foto mezzi); non
+// esiste un bucket, quindi l'URL di lettura è il valore stesso.
+export async function uploadFineScan(file) {
+  return uploadVehiclePhoto(file)
+}
+
+export async function getFineScanUrl(value) {
+  return value || null
+}
+
 // --- Timbrature presenze ---------------------------------------------------
 
 export async function getLastClocking(employeeId) {
