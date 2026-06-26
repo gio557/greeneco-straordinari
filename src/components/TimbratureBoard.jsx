@@ -30,7 +30,7 @@ export default function TimbratureBoard({ user }) {
   useLiveData(refresh, [user.id], subscribeToClockings)
 
   const inScope = (employeeId) =>
-    isAdmin || userMap[employeeId]?.managerId === user.id
+    isAdmin || (userMap[employeeId]?.managerIds || []).includes(user.id)
 
   const visible = useMemo(() => clockings.filter((c) => inScope(c.employeeId)), [clockings, userMap])
 

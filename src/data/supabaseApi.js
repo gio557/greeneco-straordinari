@@ -40,6 +40,7 @@ function rowToUser(p) {
     role: p.role,
     department: p.department,
     managerId: p.manager_id ?? undefined,
+    managerIds: Array.isArray(p.manager_ids) ? p.manager_ids : [],
     email: p.email,
   }
 }
@@ -79,10 +80,18 @@ export async function getRequestsForEmployee(employeeId) {
 }
 
 export async function getRequestsForManager(managerId) {
+  // Un manager vede le richieste dei dipendenti che gestisce (molti-a-molti).
+  const { data: emps, error: empErr } = await supabase
+    .from(PROFILES_TABLE)
+    .select('id')
+    .contains('manager_ids', [managerId])
+  if (empErr) throw new Error(empErr.message)
+  const ids = (emps || []).map((e) => e.id)
+  if (ids.length === 0) return []
   const { data, error } = await supabase
     .from(REQUESTS_TABLE)
     .select('*')
-    .eq('manager_id', managerId)
+    .in('employee_id', ids)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data.map(rowToRequest)
@@ -99,19 +108,12 @@ export async function getAllRequests() {
 }
 
 export async function createRequest({ employeeId, date, hours, reason }) {
-  // Il manager destinatario è quello associato al dipendente.
-  const { data: employee, error: empError } = await supabase
-    .from(PROFILES_TABLE)
-    .select('manager_id')
-    .eq('id', employeeId)
-    .maybeSingle()
-  if (empError) throw new Error(empError.message)
-  if (!employee) throw new Error('Dipendente non trovato')
-
+  // La richiesta è visibile a TUTTI i manager del dipendente (instradamento per
+  // relazione, non per singolo manager): non si fissa qui un destinatario.
   const row = {
     id: `req-${Date.now()}`,
     employee_id: employeeId,
-    manager_id: employee.manager_id,
+    manager_id: null,
     work_date: date,
     hours: Number(hours),
     reason: reason.trim(),
@@ -131,26 +133,30 @@ export async function decideRequest({ requestId, decision, note, managerId }) {
   if (!['approved', 'rejected'].includes(decision)) {
     throw new Error('Decisione non valida')
   }
-  // Controllo di autorizzazione lato app: il manager può decidere sulle
-  // richieste del proprio team; l'admin su qualsiasi richiesta. (Verrà
-  // rafforzato con RLS quando ci sarà il login reale.)
+  // Autorizzazione lato app: può decidere l'admin, oppure un manager che
+  // gestisce il dipendente della richiesta (uno qualsiasi dei suoi manager).
   const { data: existing, error: getError } = await supabase
     .from(REQUESTS_TABLE)
-    .select('manager_id')
+    .select('employee_id')
     .eq('id', requestId)
     .maybeSingle()
   if (getError) throw new Error(getError.message)
   if (!existing) throw new Error('Richiesta non trovata')
-  if (existing.manager_id !== managerId) {
-    const { data: actor } = await supabase
+  const { data: actor } = await supabase
+    .from(PROFILES_TABLE)
+    .select('role')
+    .eq('id', managerId)
+    .maybeSingle()
+  let allowed = actor?.role === 'admin'
+  if (!allowed) {
+    const { data: emp } = await supabase
       .from(PROFILES_TABLE)
-      .select('role')
-      .eq('id', managerId)
+      .select('manager_ids')
+      .eq('id', existing.employee_id)
       .maybeSingle()
-    if (!actor || actor.role !== 'admin') {
-      throw new Error('Non sei autorizzato a gestire questa richiesta')
-    }
+    allowed = Array.isArray(emp?.manager_ids) && emp.manager_ids.includes(managerId)
   }
+  if (!allowed) throw new Error('Non sei autorizzato a gestire questa richiesta')
 
   const { data, error } = await supabase
     .from(REQUESTS_TABLE)
@@ -192,7 +198,7 @@ export async function adminUpsertUser(adminId, user) {
     p_name: (user.name || '').trim(),
     p_role: user.role,
     p_department: user.department || '',
-    p_manager_id: user.managerId || '',
+    p_manager_ids: Array.isArray(user.managerIds) ? user.managerIds : [],
     p_email: user.email || '',
     p_password: user.password || '',
   })

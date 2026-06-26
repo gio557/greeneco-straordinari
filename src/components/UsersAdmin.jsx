@@ -3,43 +3,21 @@ import { adminListUsers, adminUpsertUser, adminDeleteUser, exportAllData } from 
 import { downloadTextFile } from '../timesheet.js'
 
 const ROLE_LABELS = { admin: 'Amministratore', manager: 'Manager', employee: 'Dipendente' }
+const SECTION = {
+  managers: { role: 'manager', title: 'Gestione manager', singular: 'manager' },
+  employees: { role: 'employee', title: 'Gestione dipendenti', singular: 'dipendente' },
+  admins: { role: 'admin', title: 'Amministratori', singular: 'amministratore' },
+}
 
-// Pannello di amministrazione utenti (solo admin): crea, modifica, elimina
-// utenti e ne imposta ID e password.
+// Amministrazione utenti: tre ingressi (manager, dipendenti, amministratori).
+// Il legame manager↔dipendente è molti-a-molti e si modifica da entrambi i lati.
 export default function UsersAdmin({ admin }) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [editing, setEditing] = useState(null) // null | {user} | 'new'
+  const [section, setSection] = useState(null) // null | 'managers' | 'employees' | 'admins'
+  const [editing, setEditing] = useState(null) // null | 'new' | user
   const [exporting, setExporting] = useState(false)
-
-  async function exportBackup() {
-    setExporting(true)
-    try {
-      const data = await exportAllData(admin.id)
-      const counts = Object.fromEntries(
-        Object.entries(data).map(([table, rows]) => [table, rows.length])
-      )
-      const payload = {
-        app: 'greeneco-operations',
-        exportedAt: new Date().toISOString(),
-        exportedBy: admin.id,
-        note: 'Copia di sicurezza dei dati. Le password NON sono incluse.',
-        counts,
-        data,
-      }
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-      downloadTextFile(
-        `backup_greeneco_${stamp}.json`,
-        JSON.stringify(payload, null, 2),
-        'application/json;charset=utf-8;'
-      )
-    } catch (err) {
-      window.alert(err.message || 'Esportazione non riuscita.')
-    } finally {
-      setExporting(false)
-    }
-  }
 
   async function load() {
     setLoading(true)
@@ -59,6 +37,27 @@ export default function UsersAdmin({ admin }) {
   }, [admin.id])
 
   const managers = useMemo(() => users.filter((u) => u.role === 'manager'), [users])
+  const employees = useMemo(() => users.filter((u) => u.role === 'employee'), [users])
+  const admins = useMemo(() => users.filter((u) => u.role === 'admin'), [users])
+  const byRole = { managers, employees, admins }
+
+  async function exportBackup() {
+    setExporting(true)
+    try {
+      const data = await exportAllData(admin.id)
+      const counts = Object.fromEntries(Object.entries(data).map(([t, rows]) => [t, rows.length]))
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+      downloadTextFile(
+        `backup_greeneco_${stamp}.json`,
+        JSON.stringify({ app: 'greeneco-operations', exportedAt: new Date().toISOString(), exportedBy: admin.id, note: 'Copia di sicurezza. Password NON incluse.', counts, data }, null, 2),
+        'application/json;charset=utf-8;'
+      )
+    } catch (err) {
+      window.alert(err.message || 'Esportazione non riuscita.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   async function remove(user) {
     if (!window.confirm(`Eliminare l'utente "${user.name}" (${user.id})?`)) return
@@ -70,92 +69,113 @@ export default function UsersAdmin({ admin }) {
     }
   }
 
-  if (editing) {
+  // --- Form di creazione/modifica ---
+  if (editing && section) {
     return (
-      <UserForm
-        admin={admin}
-        user={editing === 'new' ? null : editing}
-        managers={managers}
-        onCancel={() => setEditing(null)}
-        onSaved={async () => {
-          setEditing(null)
-          await load()
-        }}
-      />
+      <div className="board">
+        <UserForm
+          admin={admin}
+          role={SECTION[section].role}
+          user={editing === 'new' ? null : editing}
+          managers={managers}
+          employees={employees}
+          onCancel={() => setEditing(null)}
+          onSaved={async () => { setEditing(null); await load() }}
+        />
+      </div>
     )
   }
 
+  // --- Elenco di una sezione ---
+  if (section) {
+    const list = byRole[section]
+    return (
+      <div className="board">
+        <button className="back-link" onClick={() => setSection(null)}>‹ Torna alla gestione utenti</button>
+        <div className="dash-filters">
+          <h2 className="section-title">{SECTION[section].title}</h2>
+          <button className="btn-primary btn-sm" onClick={() => setEditing('new')}>+ Nuovo {SECTION[section].singular}</button>
+        </div>
+        {error && <p className="error">{error}</p>}
+        {loading ? (
+          <p className="muted center">Caricamento…</p>
+        ) : list.length === 0 ? (
+          <p className="muted small">Nessun {SECTION[section].singular} ancora.</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="dash-table">
+              <thead>
+                <tr>
+                  <th>Nome</th><th>ID</th><th>Reparto</th>
+                  {section === 'employees' && <th>Manager</th>}
+                  {section === 'managers' && <th>Dipendenti</th>}
+                  <th>Password</th><th className="actions-col">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((u) => (
+                  <tr key={u.id}>
+                    <td data-label="Nome">{u.name}</td>
+                    <td data-label="ID"><code>{u.id}</code></td>
+                    <td data-label="Reparto">{u.department ?? '—'}</td>
+                    {section === 'employees' && (
+                      <td data-label="Manager">{managerNames(u.managerIds, managers) || '—'}</td>
+                    )}
+                    {section === 'managers' && (
+                      <td data-label="Dipendenti">{teamCount(u.id, employees)}</td>
+                    )}
+                    <td data-label="Password">
+                      {u.hasPassword
+                        ? <span className="badge badge-approved">impostata</span>
+                        : <span className="badge badge-rejected">assente</span>}
+                    </td>
+                    <td data-label="Azioni" className="actions-col">
+                      <button className="btn-ghost btn-sm" onClick={() => setEditing(u)}>Modifica</button>
+                      {u.id !== admin.id && (
+                        <button className="btn-ghost btn-sm danger" onClick={() => remove(u)}>Elimina</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // --- Landing: i tre ingressi ---
   return (
     <div className="board">
-      <div className="dash-filters">
-        <h2 className="section-title">Utenti</h2>
-        <button className="btn-primary btn-sm" onClick={() => setEditing('new')}>
-          + Nuovo utente
+      <h2 className="section-title">Gestione utenti</h2>
+      {error && <p className="error">{error}</p>}
+      <div className="admin-tiles">
+        <button className="admin-tile" onClick={() => setSection('managers')}>
+          <span className="admin-tile-title">Gestione manager</span>
+          <span className="admin-tile-sub">Crea i manager e assegna i dipendenti del loro team</span>
+          <span className="admin-tile-count">{managers.length}</span>
+        </button>
+        <button className="admin-tile" onClick={() => setSection('employees')}>
+          <span className="admin-tile-title">Gestione dipendenti</span>
+          <span className="admin-tile-sub">Crea i dipendenti e abbinali a uno o più manager</span>
+          <span className="admin-tile-count">{employees.length}</span>
         </button>
       </div>
-
-      {error && <p className="error">{error}</p>}
-
-      {loading ? (
-        <p className="muted center">Caricamento…</p>
-      ) : (
-        <div className="table-wrap">
-          <table className="dash-table">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>ID</th>
-                <th>Ruolo</th>
-                <th>Reparto</th>
-                <th>Password</th>
-                <th className="actions-col">Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td data-label="Nome">{u.name}</td>
-                  <td data-label="ID"><code>{u.id}</code></td>
-                  <td data-label="Ruolo">{ROLE_LABELS[u.role] ?? u.role}</td>
-                  <td data-label="Reparto">{u.department ?? '—'}</td>
-                  <td data-label="Password">
-                    {u.hasPassword ? (
-                      <span className="badge badge-approved">impostata</span>
-                    ) : (
-                      <span className="badge badge-rejected">assente</span>
-                    )}
-                  </td>
-                  <td data-label="Azioni" className="actions-col">
-                    <button className="btn-ghost btn-sm" onClick={() => setEditing(u)}>
-                      Modifica
-                    </button>
-                    {u.id !== admin.id && (
-                      <button className="btn-ghost btn-sm danger" onClick={() => remove(u)}>
-                        Elimina
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <button className="admin-tile admin-tile-sm" onClick={() => setSection('admins')}>
+        <span className="admin-tile-title">Amministratori</span>
+        <span className="admin-tile-sub">Gestisci gli account amministratore</span>
+        <span className="admin-tile-count">{admins.length}</span>
+      </button>
 
       <p className="login-hint">
-        L'ID identifica l'utente per l'accesso e non è modificabile dopo la
-        creazione. La password viene salvata cifrata; lasciala vuota in modifica
-        per non cambiarla.
+        L'ID identifica l'utente per l'accesso e non è modificabile dopo la creazione.
+        La password è salvata cifrata; lasciala vuota in modifica per non cambiarla.
       </p>
 
       <div className="backup-box">
         <h3 className="mini-title">Backup dati</h3>
-        <p className="muted small">
-          Scarica una copia di sicurezza di tutti i dati (utenti, richieste,
-          timbrature, mezzi) in un unico file JSON. Le password non sono
-          incluse. Utile come copia manuale finché non sarà attivo il backup
-          automatico.
-        </p>
+        <p className="muted small">Scarica una copia di sicurezza di tutti i dati in un file JSON (password escluse).</p>
         <button className="btn-ghost" onClick={exportBackup} disabled={exporting}>
           {exporting ? 'Esportazione…' : '⬇ Esporta backup completo (JSON)'}
         </button>
@@ -164,23 +184,39 @@ export default function UsersAdmin({ admin }) {
   )
 }
 
-function UserForm({ admin, user, managers, onCancel, onSaved }) {
+function managerNames(ids, managers) {
+  return (ids || [])
+    .map((id) => managers.find((m) => m.id === id)?.name || id)
+    .join(', ')
+}
+function teamCount(managerId, employees) {
+  const n = employees.filter((e) => (e.managerIds || []).includes(managerId)).length
+  return n === 0 ? '—' : `${n}`
+}
+
+function UserForm({ admin, role, user, managers, employees, onCancel, onSaved }) {
   const isNew = !user
   const [form, setForm] = useState({
     id: user?.id ?? '',
     name: user?.name ?? '',
-    role: user?.role ?? 'employee',
     department: user?.department ?? '',
     email: user?.email ?? '',
-    managerId: user?.managerId ?? '',
     password: '',
   })
+  // Per i dipendenti: manager abbinati. Per i manager: dipendenti del team.
+  const [managerIds, setManagerIds] = useState(() => new Set(user?.managerIds || []))
+  const [teamIds, setTeamIds] = useState(
+    () => new Set((employees || []).filter((e) => (e.managerIds || []).includes(user?.id)).map((e) => e.id))
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  function set(field, value) {
-    setForm((f) => ({ ...f, [field]: value }))
-  }
+  const set = (field, value) => setForm((f) => ({ ...f, [field]: value }))
+  const toggle = (setFn) => (id) => setFn((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
 
   async function submit(e) {
     e.preventDefault()
@@ -191,10 +227,29 @@ function UserForm({ admin, user, managers, onCancel, onSaved }) {
     setBusy(true)
     setError('')
     try {
+      const id = form.id.trim()
       await adminUpsertUser(admin.id, {
-        ...form,
-        managerId: form.role === 'employee' ? form.managerId : '',
+        id,
+        name: form.name,
+        role,
+        department: form.department,
+        email: form.email,
+        password: form.password,
+        managerIds: role === 'employee' ? [...managerIds] : [],
       })
+      // Lato manager: applica le modifiche al team aggiornando i dipendenti.
+      if (role === 'manager') {
+        for (const emp of employees) {
+          const had = (emp.managerIds || []).includes(id)
+          const has = teamIds.has(emp.id)
+          if (had !== has) {
+            const nextIds = has
+              ? [...new Set([...(emp.managerIds || []), id])]
+              : (emp.managerIds || []).filter((m) => m !== id)
+            await adminUpsertUser(admin.id, { ...emp, managerIds: nextIds, password: '' })
+          }
+        }
+      }
       await onSaved()
     } catch (err) {
       setError(err.message || 'Salvataggio non riuscito.')
@@ -203,102 +258,82 @@ function UserForm({ admin, user, managers, onCancel, onSaved }) {
   }
 
   return (
-    <div className="board">
+    <>
       <button className="back-link" onClick={onCancel}>‹ Torna all'elenco</button>
-      <h2 className="section-title">{isNew ? 'Nuovo utente' : `Modifica ${user.name}`}</h2>
+      <h2 className="section-title">
+        {isNew ? `Nuovo ${ROLE_LABELS[role].toLowerCase()}` : `Modifica ${user.name}`}
+      </h2>
 
       <form className="user-form" onSubmit={submit}>
         <label className="field">
           <span className="field-label">ID utente</span>
-          <input
-            className="input"
-            value={form.id}
-            onChange={(e) => set('id', e.target.value)}
-            placeholder="es. emp-7"
-            autoCapitalize="none"
-            disabled={!isNew}
-            required
-          />
+          <input className="input" value={form.id} onChange={(e) => set('id', e.target.value)}
+            placeholder={role === 'manager' ? 'es. mgr-3' : role === 'admin' ? 'es. admin-2' : 'es. emp-7'}
+            autoCapitalize="none" disabled={!isNew} required />
         </label>
-
         <label className="field">
           <span className="field-label">Nome e cognome</span>
-          <input
-            className="input"
-            value={form.name}
-            onChange={(e) => set('name', e.target.value)}
-            required
-          />
+          <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </label>
-
         <label className="field">
-          <span className="field-label">Ruolo</span>
-          <select className="input" value={form.role} onChange={(e) => set('role', e.target.value)}>
-            <option value="employee">Dipendente</option>
-            <option value="manager">Manager</option>
-            <option value="admin">Amministratore</option>
-          </select>
+          <span className="field-label">Reparto</span>
+          <input className="input" value={form.department} onChange={(e) => set('department', e.target.value)} />
+        </label>
+        <label className="field">
+          <span className="field-label">Email</span>
+          <input className="input" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} autoCapitalize="none" />
         </label>
 
-        {form.role === 'employee' && (
-          <label className="field">
-            <span className="field-label">Manager di riferimento</span>
-            <select
-              className="input"
-              value={form.managerId}
-              onChange={(e) => set('managerId', e.target.value)}
-            >
-              <option value="">— nessuno —</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
-              ))}
-            </select>
-          </label>
+        {role === 'employee' && (
+          <div className="field">
+            <span className="field-label">Manager abbinati (uno o più)</span>
+            {managers.length === 0 ? (
+              <p className="muted small">Nessun manager disponibile: creane prima uno.</p>
+            ) : (
+              <div className="check-list">
+                {managers.map((m) => (
+                  <label key={m.id} className="check-item">
+                    <input type="checkbox" checked={managerIds.has(m.id)} onChange={() => toggle(setManagerIds)(m.id)} />
+                    <span>{m.name} <code>{m.id}</code></span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {role === 'manager' && (
+          <div className="field">
+            <span className="field-label">Dipendenti del team</span>
+            {employees.length === 0 ? (
+              <p className="muted small">Nessun dipendente ancora: potrai assegnarli dopo averli creati.</p>
+            ) : (
+              <div className="check-list">
+                {employees.map((emp) => (
+                  <label key={emp.id} className="check-item">
+                    <input type="checkbox" checked={teamIds.has(emp.id)} onChange={() => toggle(setTeamIds)(emp.id)} />
+                    <span>{emp.name} <code>{emp.id}</code></span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {isNew && <p className="muted small">Suggerimento: salva prima il manager, poi assegna il team.</p>}
+          </div>
         )}
 
         <label className="field">
-          <span className="field-label">Reparto</span>
-          <input
-            className="input"
-            value={form.department}
-            onChange={(e) => set('department', e.target.value)}
-          />
-        </label>
-
-        <label className="field">
-          <span className="field-label">Email</span>
-          <input
-            className="input"
-            type="email"
-            value={form.email}
-            onChange={(e) => set('email', e.target.value)}
-            autoCapitalize="none"
-          />
-        </label>
-
-        <label className="field">
-          <span className="field-label">
-            Password {isNew ? '' : '(lascia vuoto per non cambiarla)'}
-          </span>
-          <input
-            className="input"
-            type="text"
-            value={form.password}
-            onChange={(e) => set('password', e.target.value)}
-            autoComplete="new-password"
-            placeholder={isNew ? 'Password di accesso' : '••••••'}
-          />
+          <span className="field-label">Password {isNew ? '' : '(lascia vuoto per non cambiarla)'}</span>
+          <input className="input" type="text" value={form.password} onChange={(e) => set('password', e.target.value)}
+            autoComplete="new-password" placeholder={isNew ? 'Password di accesso' : '••••••'} />
         </label>
 
         {error && <p className="error">{error}</p>}
 
         <div className="decision-actions">
           <button type="button" className="btn-ghost" onClick={onCancel}>Annulla</button>
-          <button type="submit" className="btn-primary" disabled={busy}>
-            {busy ? 'Salvataggio…' : 'Salva'}
-          </button>
+          <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Salvataggio…' : 'Salva'}</button>
         </div>
       </form>
-    </div>
+    </>
   )
 }

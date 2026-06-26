@@ -28,7 +28,7 @@ export const USERS = [
     name: 'Giulia Rossi',
     role: 'employee',
     department: 'Produzione',
-    managerId: 'mgr-1',
+    managerIds: ['mgr-1', 'mgr-2'],
     email: 'giulia.rossi@azienda.it',
   },
   {
@@ -36,7 +36,7 @@ export const USERS = [
     name: 'Antonio Russo',
     role: 'employee',
     department: 'Produzione',
-    managerId: 'mgr-1',
+    managerIds: ['mgr-1'],
     email: 'antonio.russo@azienda.it',
   },
   {
@@ -44,7 +44,7 @@ export const USERS = [
     name: 'Sara Colombo',
     role: 'employee',
     department: 'Logistica',
-    managerId: 'mgr-2',
+    managerIds: ['mgr-2'],
     email: 'sara.colombo@azienda.it',
   },
 ]

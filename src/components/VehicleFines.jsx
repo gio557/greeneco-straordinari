@@ -27,7 +27,7 @@ export default function VehicleFines({ user }) {
   useLiveData(refresh, [user.id], subscribeToFines)
   const attachUrls = useFineAttachments(fines)
 
-  const inScope = (employeeId) => isAdmin || userMap[employeeId]?.managerId === user.id
+  const inScope = (employeeId) => isAdmin || (userMap[employeeId]?.managerIds || []).includes(user.id)
   const visible = useMemo(() => fines.filter((f) => inScope(f.employeeId)), [fines, userMap]) // eslint-disable-line react-hooks/exhaustive-deps
   const name = (id) => userMap[id]?.name || id || '—'
   const vname = (id) => vehicles.find((v) => v.id === id)?.name || id || '—'

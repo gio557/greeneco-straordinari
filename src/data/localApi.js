@@ -107,8 +107,12 @@ export async function getRequestsForEmployee(employeeId) {
 
 export async function getRequestsForManager(managerId) {
   await delay()
-  return load()
-    .requests.filter((r) => r.managerId === managerId)
+  const state = load()
+  const managed = new Set(
+    state.users.filter((u) => (u.managerIds || []).includes(managerId)).map((u) => u.id)
+  )
+  return state.requests
+    .filter((r) => managed.has(r.employeeId))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
@@ -122,9 +126,8 @@ export async function getAllRequests() {
 export async function createRequest({ employeeId, date, hours, reason }) {
   await delay()
   const state = load()
-  const employee = state.users.find((u) => u.id === employeeId)
-  if (!employee) throw new Error('Dipendente non trovato')
-
+  // La richiesta è visibile a tutti i manager del dipendente: non si fissa qui
+  // un destinatario.
   const request = {
     id: `req-${Date.now()}`,
     employeeId,
@@ -132,7 +135,7 @@ export async function createRequest({ employeeId, date, hours, reason }) {
     hours: Number(hours),
     reason: reason.trim(),
     status: 'pending',
-    managerId: employee.managerId,
+    managerId: null,
     decisionNote: '',
     decidedBy: null,
     createdAt: new Date().toISOString(),
@@ -152,7 +155,9 @@ export async function decideRequest({ requestId, decision, note, managerId }) {
   const request = state.requests.find((r) => r.id === requestId)
   if (!request) throw new Error('Richiesta non trovata')
   const actor = state.users.find((u) => u.id === managerId)
-  if (request.managerId !== managerId && actor?.role !== 'admin') {
+  const employee = state.users.find((u) => u.id === request.employeeId)
+  const manages = (employee?.managerIds || []).includes(managerId)
+  if (actor?.role !== 'admin' && !manages) {
     throw new Error('Non sei autorizzato a gestire questa richiesta')
   }
 
@@ -195,12 +200,14 @@ export async function adminUpsertUser(adminId, user) {
     throw new Error('Ruolo non valido')
   }
 
+  const managerIds = Array.isArray(user.managerIds) ? user.managerIds : []
   const next = {
     id,
     name,
     role: user.role,
     department: user.department || undefined,
-    managerId: user.managerId || undefined,
+    managerIds,
+    managerId: managerIds[0] || undefined, // compatibilità
     email: user.email || undefined,
   }
   const idx = state.users.findIndex((u) => u.id === id)
@@ -221,9 +228,15 @@ export async function adminDeleteUser(adminId, userId) {
   assertAdmin(state, adminId)
   if (adminId === userId) throw new Error('Non puoi eliminare il tuo stesso account')
   const linked = state.requests.some(
-    (r) => r.employeeId === userId || r.managerId === userId || r.decidedBy === userId
+    (r) => r.employeeId === userId || r.decidedBy === userId
   )
   if (linked) throw new Error('Impossibile eliminare: l\'utente ha richieste collegate')
+  // Se è un manager, lo si toglie dagli abbinamenti dei dipendenti.
+  state.users = state.users.map((u) =>
+    (u.managerIds || []).includes(userId)
+      ? { ...u, managerIds: u.managerIds.filter((m) => m !== userId), managerId: u.managerId === userId ? undefined : u.managerId }
+      : u
+  )
   state.users = state.users.filter((u) => u.id !== userId)
   if (state.passwords) delete state.passwords[userId]
   save(state)

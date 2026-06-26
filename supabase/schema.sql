@@ -45,6 +45,15 @@ alter table public.profiles
   add constraint profiles_role_check
   check (role in ('employee', 'manager', 'admin'));
 
+-- Manager del dipendente: relazione MOLTI-A-MOLTI (un dipendente può avere più
+-- manager). Si usa una colonna array; il vecchio singolo manager_id resta per
+-- compatibilità (allineato al primo elemento).
+alter table public.profiles add column if not exists manager_ids text[] not null default '{}';
+-- Migrazione una tantum dal vecchio manager_id singolo (idempotente).
+update public.profiles
+  set manager_ids = array[manager_id]
+  where manager_id is not null and coalesce(array_length(manager_ids, 1), 0) = 0;
+
 -- Credenziali di accesso: password CIFRATA, in tabella separata e protetta.
 create table if not exists public.user_credentials (
   user_id    text primary key references public.profiles (id) on delete cascade,
@@ -125,6 +134,7 @@ as $$
     'role', p.role,
     'department', p.department,
     'managerId', p.manager_id,
+    'managerIds', coalesce(p.manager_ids, '{}'),
     'email', p.email
   );
 $$;
@@ -214,15 +224,19 @@ $$;
 
 -- Crea o aggiorna un utente; se p_password è valorizzata, (re)imposta la
 -- password cifrata. Solo l'admin può eseguirla.
+-- Firma cambiata (p_manager_id text → p_manager_ids text[]): si elimina la
+-- vecchia versione prima di ricrearla.
+drop function if exists public.admin_upsert_user(text, text, text, text, text, text, text, text);
+
 create or replace function public.admin_upsert_user(
-  p_admin_id   text,
-  p_id         text,
-  p_name       text,
-  p_role       text,
-  p_department text,
-  p_manager_id text,
-  p_email      text,
-  p_password   text
+  p_admin_id    text,
+  p_id          text,
+  p_name        text,
+  p_role        text,
+  p_department  text,
+  p_manager_ids text[],
+  p_email       text,
+  p_password    text
 )
 returns jsonb
 language plpgsql
@@ -231,6 +245,7 @@ set search_path = public, extensions
 as $$
 declare
   v_profile public.profiles;
+  v_managers text[] := coalesce(p_manager_ids, '{}');
 begin
   if not public.app_is_admin(p_admin_id) then
     raise exception 'Non autorizzato';
@@ -244,21 +259,23 @@ begin
     raise exception 'Ruolo non valido';
   end if;
 
-  insert into public.profiles (id, name, role, department, manager_id, email)
+  insert into public.profiles (id, name, role, department, manager_id, manager_ids, email)
   values (
     p_id,
     p_name,
     p_role,
     nullif(p_department, ''),
-    nullif(p_manager_id, ''),
+    nullif(v_managers[1], ''),
+    v_managers,
     nullif(p_email, '')
   )
   on conflict (id) do update set
-    name       = excluded.name,
-    role       = excluded.role,
-    department = excluded.department,
-    manager_id = excluded.manager_id,
-    email      = excluded.email
+    name        = excluded.name,
+    role        = excluded.role,
+    department  = excluded.department,
+    manager_id  = excluded.manager_id,
+    manager_ids = excluded.manager_ids,
+    email       = excluded.email
   returning * into v_profile;
 
   if coalesce(p_password, '') <> '' then
@@ -289,6 +306,9 @@ begin
     raise exception 'Non puoi eliminare il tuo stesso account';
   end if;
 
+  -- Se è un manager, lo si toglie dagli abbinamenti dei dipendenti.
+  update public.profiles set manager_ids = array_remove(manager_ids, p_user_id);
+
   if exists (
     select 1 from public.overtime_requests
     where employee_id = p_user_id
@@ -305,7 +325,7 @@ $$;
 -- Permessi di esecuzione per la chiave pubblica.
 grant execute on function public.app_login(text, text) to anon, authenticated;
 grant execute on function public.admin_list_users(text) to anon, authenticated;
-grant execute on function public.admin_upsert_user(text, text, text, text, text, text, text, text) to anon, authenticated;
+grant execute on function public.admin_upsert_user(text, text, text, text, text, text[], text, text) to anon, authenticated;
 grant execute on function public.admin_delete_user(text, text) to anon, authenticated;
 
 -- --- Tempo reale ------------------------------------------------------------

@@ -64,7 +64,7 @@ export default function MonthlyTimesheet({ user }) {
   // solo il proprio team.
   const employees = useMemo(() => {
     return Object.values(userMap)
-      .filter((u) => (isAdmin ? u.role !== 'admin' : u.managerId === user.id))
+      .filter((u) => (isAdmin ? u.role !== 'admin' : (u.managerIds || []).includes(user.id)))
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
   }, [userMap, isAdmin, user.id])
 
