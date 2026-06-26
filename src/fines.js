@@ -12,19 +12,26 @@ export function formatEuro(n) {
   return '€ ' + Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// Trova il dipendente che aveva il mezzo alla data dell'infrazione, in base allo
-// storico dei passaggi di consegna (per l'attribuzione automatica della multa).
+// Passaggio di consegna che copriva il mezzo a una certa data (chi lo aveva in
+// carico), in base allo storico. Ritorna l'handover o null.
+export function findHandoverAt(handovers, vehicleId, atISO) {
+  if (!vehicleId || !atISO) return null
+  const t = Date.parse(atISO)
+  if (!Number.isFinite(t)) return null
+  return (
+    (handovers || [])
+      .filter(
+        (h) =>
+          h.vehicleId === vehicleId &&
+          Date.parse(h.takenAt) <= t &&
+          (!h.returnedAt || Date.parse(h.returnedAt) >= t)
+      )
+      .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0] || null
+  )
+}
+
+// Dipendente che aveva il mezzo alla data dell'infrazione (per l'attribuzione
+// automatica della multa).
 export function suggestDriver(handovers, vehicleId, infractionISO) {
-  if (!vehicleId || !infractionISO) return ''
-  const t = Date.parse(infractionISO)
-  if (!Number.isFinite(t)) return ''
-  const candidates = (handovers || [])
-    .filter(
-      (h) =>
-        h.vehicleId === vehicleId &&
-        Date.parse(h.takenAt) <= t &&
-        (!h.returnedAt || Date.parse(h.returnedAt) >= t)
-    )
-    .sort((a, b) => b.takenAt.localeCompare(a.takenAt))
-  return candidates[0]?.employeeId || ''
+  return findHandoverAt(handovers, vehicleId, infractionISO)?.employeeId || ''
 }

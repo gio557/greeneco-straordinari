@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  listVehicles, getUserMap, getAllFines, getRecentHandovers, createFine, cancelFine, subscribeToFines,
+  listVehicles, getUserMap, getAllFines, getHandoverAt, createFine, cancelFine, subscribeToFines,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { formatDateTime } from '../utils.js'
-import { FINE_STATUS, formatEuro, suggestDriver } from '../fines.js'
+import { FINE_STATUS, formatEuro } from '../fines.js'
 
 // Gestione sanzioni per manager/admin: registrazione (con attribuzione proposta
-// dal passaggio di consegna) ed elenco con stato.
+// dal passaggio di consegna attivo alla data dell'infrazione) ed elenco.
 export default function VehicleFines({ user }) {
   const isAdmin = user.role === 'admin'
   const [vehicles, setVehicles] = useState([])
   const [userMap, setUserMap] = useState({})
-  const [handovers, setHandovers] = useState([])
   const [fines, setFines] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
 
   async function refresh(showSpinner = false) {
     if (showSpinner) setLoading(true)
-    const [v, m, h, f] = await Promise.all([
-      listVehicles(), getUserMap(), getRecentHandovers(300), getAllFines(),
-    ])
-    setVehicles(v); setUserMap(m); setHandovers(h); setFines(f); setLoading(false)
+    const [v, m, f] = await Promise.all([listVehicles(), getUserMap(), getAllFines()])
+    setVehicles(v); setUserMap(m); setFines(f); setLoading(false)
   }
 
   useLiveData(refresh, [user.id], subscribeToFines)
@@ -56,7 +53,7 @@ export default function VehicleFines({ user }) {
         <FineForm
           vehicles={vehicles}
           employees={employees}
-          handovers={handovers}
+          userMap={userMap}
           user={user}
           onClose={() => setShowForm(false)}
           onSaved={async () => { setShowForm(false); await refresh() }}
@@ -99,7 +96,7 @@ export default function VehicleFines({ user }) {
   )
 }
 
-function FineForm({ vehicles, employees, handovers, user, onClose, onSaved }) {
+function FineForm({ vehicles, employees, userMap, user, onClose, onSaved }) {
   const [vehicleId, setVehicleId] = useState('')
   const [infractionAt, setInfractionAt] = useState('')
   const [employeeId, setEmployeeId] = useState('')
@@ -110,13 +107,27 @@ function FineForm({ vehicles, employees, handovers, user, onClose, onSaved }) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [autofilled, setAutofilled] = useState(false)
+  // Attribuzione: passaggio di consegna trovato per mezzo + data (query mirata).
+  const [lookup, setLookup] = useState({ state: 'idle', handover: null })
 
-  const infractionISO = infractionAt ? new Date(infractionAt).toISOString() : ''
-  const suggested = suggestDriver(handovers, vehicleId, infractionISO)
   useEffect(() => {
-    if (suggested) { setEmployeeId(suggested); setAutofilled(true) }
-  }, [suggested])
+    if (!vehicleId || !infractionAt) {
+      setLookup({ state: 'idle', handover: null })
+      return
+    }
+    let cancelled = false
+    setLookup({ state: 'loading', handover: null })
+    getHandoverAt(vehicleId, new Date(infractionAt).toISOString())
+      .then((h) => {
+        if (cancelled) return
+        setLookup({ state: 'done', handover: h })
+        if (h) setEmployeeId(h.employeeId)
+      })
+      .catch(() => { if (!cancelled) setLookup({ state: 'done', handover: null }) })
+    return () => { cancelled = true }
+  }, [vehicleId, infractionAt])
+
+  const nameOf = (id) => userMap[id]?.name || id || '—'
 
   async function submit(e) {
     e.preventDefault()
@@ -160,11 +171,20 @@ function FineForm({ vehicles, employees, handovers, user, onClose, onSaved }) {
             <input type="datetime-local" value={infractionAt} onChange={(e) => setInfractionAt(e.target.value)} />
           </label>
           <label className="field"><span>Dipendente responsabile *</span>
-            <select value={employeeId} onChange={(e) => { setEmployeeId(e.target.value); setAutofilled(false) }}>
+            <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
               <option value="">— seleziona —</option>
               {employees.map((em) => <option key={em.id} value={em.id}>{em.name}</option>)}
             </select>
-            {autofilled && suggested && <small className="muted">Proposto in automatico dal passaggio di consegna del mezzo.</small>}
+            {lookup.state === 'loading' && <small className="muted">Verifico chi aveva il mezzo a quella data…</small>}
+            {lookup.state === 'done' && lookup.handover && (
+              <small className="muted">
+                Proposto dal passaggio di consegna: <strong>{nameOf(lookup.handover.employeeId)}</strong>
+                {' '}(dal {formatDateTime(lookup.handover.takenAt)} {lookup.handover.returnedAt ? `al ${formatDateTime(lookup.handover.returnedAt)}` : '— mezzo ancora in uso'}).
+              </small>
+            )}
+            {lookup.state === 'done' && !lookup.handover && (
+              <small className="muted">Nessun passaggio di consegna registrato per quella data: seleziona il dipendente manualmente.</small>
+            )}
           </label>
           <label className="field"><span>Importo (€)</span>
             <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="es. 42,00" />

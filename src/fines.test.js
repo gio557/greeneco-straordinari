@@ -2,7 +2,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { suggestDriver } from './fines.js'
+import { suggestDriver, findHandoverAt } from './fines.js'
 
 const H = (id, vehicleId, employeeId, takenAt, returnedAt = null) => ({
   id, vehicleId, employeeId, takenAt, returnedAt,
@@ -32,4 +32,17 @@ test('nessun passaggio di consegna corrispondente → stringa vuota', () => {
 test('input incompleti → stringa vuota', () => {
   assert.equal(suggestDriver([], '', '2026-06-10T10:00:00Z'), '')
   assert.equal(suggestDriver([], 'veh-1', ''), '')
+})
+
+test('findHandoverAt ritorna il passaggio di consegna anche per date lontane', () => {
+  const handovers = [
+    H('h1', 'veh-1', 'emp-1', '2026-01-10T08:00:00Z', '2026-01-15T18:00:00Z'),
+    H('h2', 'veh-1', 'emp-2', '2026-04-01T08:00:00Z', null),
+  ]
+  // Infrazione di "3 mesi prima": trova comunque il record corretto.
+  const h = findHandoverAt(handovers, 'veh-1', '2026-01-12T10:00:00Z')
+  assert.equal(h?.id, 'h1')
+  assert.equal(h?.employeeId, 'emp-1')
+  // Nessuna copertura → null.
+  assert.equal(findHandoverAt(handovers, 'veh-1', '2026-02-20T10:00:00Z'), null)
 })
