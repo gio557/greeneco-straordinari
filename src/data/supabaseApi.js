@@ -494,6 +494,7 @@ function rowToFine(f) {
     type: f.type ?? '',
     verbale: f.verbale ?? '',
     note: f.note ?? '',
+    attachmentUrl: f.attachment_url ?? null,
     status: f.status,
     acknowledgedAt: f.acknowledged_at,
     contestedAt: f.contested_at,
@@ -503,7 +504,7 @@ function rowToFine(f) {
   }
 }
 
-export async function createFine({ vehicleId, employeeId, infractionAt, amount, place, type, verbale, note, recordedBy }) {
+export async function createFine({ vehicleId, employeeId, infractionAt, amount, place, type, verbale, note, attachmentUrl, recordedBy }) {
   const { data, error } = await supabase
     .from('vehicle_fines')
     .insert({
@@ -516,6 +517,7 @@ export async function createFine({ vehicleId, employeeId, infractionAt, amount, 
       type: type || null,
       verbale: verbale || null,
       note: (note || '').trim(),
+      attachment_url: attachmentUrl || null,
       recorded_by: recordedBy || null,
     })
     .select()

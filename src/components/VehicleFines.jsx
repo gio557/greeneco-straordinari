@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  listVehicles, getUserMap, getAllFines, getHandoverAt, createFine, cancelFine, subscribeToFines,
+  listVehicles, getUserMap, getAllFines, getHandoverAt, createFine, cancelFine, subscribeToFines, uploadFineScan,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { formatDateTime } from '../utils.js'
@@ -79,6 +79,7 @@ export default function VehicleFines({ user }) {
                   <div>📅 {formatDateTime(f.infractionAt)}{f.type ? ` · ${f.type}` : ''}</div>
                   {f.place && <div>📍 {f.place}</div>}
                   {f.verbale && <div>N. verbale: {f.verbale}</div>}
+                  {f.attachmentUrl && <div><a href={f.attachmentUrl} target="_blank" rel="noreferrer">📎 Scansione verbale</a></div>}
                   {f.acknowledgedAt && <div className="muted small">Presa visione: {formatDateTime(f.acknowledgedAt)}</div>}
                   {f.status === 'contested' && <div className="request-note">Contestazione: {f.contestNote || '(senza nota)'}</div>}
                 </div>
@@ -105,6 +106,8 @@ function FineForm({ vehicles, employees, userMap, user, onClose, onSaved }) {
   const [type, setType] = useState('')
   const [verbale, setVerbale] = useState('')
   const [note, setNote] = useState('')
+  const [file, setFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   // Attribuzione: passaggio di consegna trovato per mezzo + data (query mirata).
@@ -138,6 +141,15 @@ function FineForm({ vehicles, employees, userMap, user, onClose, onSaved }) {
     setBusy(true)
     setError('')
     try {
+      let attachmentUrl = null
+      if (file) {
+        setUploading(true)
+        try {
+          attachmentUrl = await uploadFineScan(file)
+        } finally {
+          setUploading(false)
+        }
+      }
       await createFine({
         vehicleId,
         employeeId,
@@ -147,6 +159,7 @@ function FineForm({ vehicles, employees, userMap, user, onClose, onSaved }) {
         type,
         verbale,
         note,
+        attachmentUrl,
         recordedBy: user.id,
       })
       onSaved()
@@ -201,9 +214,15 @@ function FineForm({ vehicles, employees, userMap, user, onClose, onSaved }) {
           <label className="field"><span>Note</span>
             <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
+          <label className="field"><span>Scansione del verbale (immagine o PDF)</span>
+            <input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            {file && <small className="muted">Selezionato: {file.name}</small>}
+          </label>
           {error && <p className="error">{error}</p>}
           <div className="form-actions">
-            <button className="btn-primary" disabled={busy} type="submit">{busy ? 'Salvataggio…' : 'Registra'}</button>
+            <button className="btn-primary" disabled={busy} type="submit">
+              {uploading ? 'Caricamento allegato…' : busy ? 'Salvataggio…' : 'Registra'}
+            </button>
             <button className="btn-ghost" type="button" onClick={onClose}>Annulla</button>
           </div>
         </form>
