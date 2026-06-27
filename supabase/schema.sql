@@ -307,7 +307,10 @@ begin
   end if;
 
   -- Se è un manager, lo si toglie dagli abbinamenti dei dipendenti.
-  update public.profiles set manager_ids = array_remove(manager_ids, p_user_id);
+  -- (La clausola WHERE è necessaria: Supabase blocca gli UPDATE senza WHERE.)
+  update public.profiles
+     set manager_ids = array_remove(manager_ids, p_user_id)
+   where p_user_id = any(manager_ids);
 
   if exists (
     select 1 from public.overtime_requests

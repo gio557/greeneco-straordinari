@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPermissionsConfig, savePermissionsConfig, login } from '../data/api.js'
 import { PERMISSIONS, puo } from '../permissions.js'
+import PasswordConfirm from './PasswordConfirm.jsx'
 
 // Catalogo raggruppato per area, per disegnare la matrice dei flag.
 const GROUPS = (() => {
@@ -43,7 +44,11 @@ export default function PermessiPage({ user }) {
   // Applica l'azione confermata (chiamata dalla modale password).
   async function applyPending(pwd) {
     // 1) verifica la password dell'utente abilitato riusando il login.
-    await login(user.id, pwd)
+    try {
+      await login(user.id, pwd)
+    } catch {
+      throw new Error('Password non corretta.')
+    }
     // 2) costruisci la nuova configurazione.
     const next = {
       categories: [...config.categories],
@@ -149,6 +154,7 @@ export default function PermessiPage({ user }) {
 
       {pending && (
         <PasswordConfirm
+          title="Conferma modifica"
           summary={
             pending.type === 'create'
               ? `Creare la categoria “${pending.name}”`
@@ -164,54 +170,4 @@ export default function PermessiPage({ user }) {
 
 function labelOf(key) {
   return PERMISSIONS.find((p) => p.key === key)?.label || key
-}
-
-// Modale di conferma: chiede la password dell'utente abilitato e la verifica
-// prima di applicare la modifica.
-function PasswordConfirm({ summary, onConfirm, onCancel }) {
-  const [pwd, setPwd] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-
-  async function submit(e) {
-    e.preventDefault()
-    if (!pwd) { setErr('Inserisci la password.'); return }
-    setBusy(true)
-    setErr('')
-    try {
-      await onConfirm(pwd)
-    } catch {
-      setErr('Password non corretta.')
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mini-title">Conferma modifica</h3>
-        <p className="muted small">{summary}.</p>
-        <form onSubmit={submit}>
-          <label className="field">
-            <span className="field-label">La tua password</span>
-            <input
-              className="input"
-              type="password"
-              value={pwd}
-              onChange={(e) => setPwd(e.target.value)}
-              autoFocus
-              autoComplete="current-password"
-            />
-          </label>
-          {err && <p className="error">{err}</p>}
-          <div className="decision-actions">
-            <button type="button" className="btn-ghost" onClick={onCancel}>Annulla</button>
-            <button type="submit" className="btn-primary" disabled={busy}>
-              {busy ? 'Verifica…' : 'Conferma'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
 }
