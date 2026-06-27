@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { adminListUsers, adminUpsertUser, adminDeleteUser, exportAllData, getPermissionsConfig } from '../data/api.js'
+import { adminListUsers, adminUpsertUser, adminDeleteUser, exportAllData, getPermissionsConfig, login } from '../data/api.js'
 import { downloadTextFile } from '../timesheet.js'
 import { initials } from '../utils.js'
-import { puo } from '../permissions.js'
+import { puo, categoryOf } from '../permissions.js'
+import PasswordConfirm from './PasswordConfirm.jsx'
+
+// Solo questi reparti possono ELIMINARE altri utenti.
+const CAN_DELETE_CATEGORIES = ['Amministratore', 'CEO & C']
 
 const ROLE_LABELS = { admin: 'Amministratore', manager: 'Manager', employee: 'Dipendente', paghe: 'Ufficio paghe' }
 const SECTION = {
@@ -39,9 +43,11 @@ export default function UsersAdmin({ admin }) {
   const [editing, setEditing] = useState(null) // null | 'new' | user
   const [exporting, setExporting] = useState(false)
   const [permConfig, setPermConfig] = useState(null)
+  const [confirmDel, setConfirmDel] = useState(null) // utente in attesa di eliminazione
   const categories = permConfig?.categories || []
   const canCreate = puo(admin, 'profili.create', permConfig)
-  const canDelete = puo(admin, 'profili.delete', permConfig)
+  // L'eliminazione è riservata ad Amministratore e CEO & C (oltre al permesso).
+  const canDelete = CAN_DELETE_CATEGORIES.includes(categoryOf(admin, permConfig))
   const canCategory = puo(admin, 'profili.category', permConfig)
   const canBackup = puo(admin, 'backup.export', permConfig)
 
@@ -90,14 +96,17 @@ export default function UsersAdmin({ admin }) {
     }
   }
 
-  async function remove(user) {
-    if (!window.confirm(`Eliminare l'utente "${user.name}" (${user.id})?`)) return
+  // Eliminazione confermata con la password (verificata riusando il login).
+  async function confirmDelete(pwd) {
     try {
-      await adminDeleteUser(admin.id, user.id)
-      await load()
-    } catch (err) {
-      window.alert(err.message || 'Eliminazione non riuscita.')
+      await login(admin.id, pwd)
+    } catch {
+      throw new Error('Password non corretta.')
     }
+    // Password ok: procede con l'eliminazione (può fallire per altri motivi).
+    await adminDeleteUser(admin.id, confirmDel.id)
+    setConfirmDel(null)
+    await load()
   }
 
   // --- Form di creazione/modifica ---
@@ -169,7 +178,7 @@ export default function UsersAdmin({ admin }) {
                         <button className="btn-ghost btn-sm" onClick={() => setEditing(u)}>Modifica</button>
                       )}
                       {canDelete && u.id !== admin.id && (
-                        <button className="btn-ghost btn-sm danger" onClick={() => remove(u)}>Elimina</button>
+                        <button className="btn-ghost btn-sm danger" onClick={() => setConfirmDel(u)}>Elimina</button>
                       )}
                       {!canCreate && !canDelete && <span className="muted small">—</span>}
                     </td>
@@ -178,6 +187,17 @@ export default function UsersAdmin({ admin }) {
               </tbody>
             </table>
           </div>
+        )}
+
+        {confirmDel && (
+          <PasswordConfirm
+            title="Conferma eliminazione"
+            summary={`Eliminare l'utente «${confirmDel.name}» (${confirmDel.id})`}
+            confirmLabel="Elimina"
+            danger
+            onConfirm={confirmDelete}
+            onCancel={() => setConfirmDel(null)}
+          />
         )}
       </div>
     )
