@@ -107,13 +107,22 @@ export function categoryOf(user, config) {
   return byRole[user.role] || 'Operativo'
 }
 
-// Permesso? Anti-blocco: se manca la config non si blocca nulla; gli
-// amministratori possono sempre tutto.
+// Permessi che NON possono mai essere tolti a chi amministra (ruolo admin o
+// categoria Amministratore): garantiscono di poter SEMPRE rientrare in
+// "Categorie & Permessi" e ri-abilitare i flag. Tutti gli altri permessi —
+// anche per l'Amministratore — rispettano la configurazione, così disattivare
+// un flag (es. "Avere il proprio Cassetto") ha davvero effetto.
+export const ADMIN_SAFE = ['area.permessi', 'permessi.edit']
+
+// L'utente ha il permesso? Regole:
+//   • i permessi anti-blocco sono sempre garantiti a chi amministra;
+//   • senza configurazione caricata non si blocca nulla;
+//   • altrimenti decide il flag della categoria dell'utente.
 export function puo(user, perm, config) {
   if (!user) return false
-  if (user.role === 'admin') return true
-  if (!config || !config.perms) return true
   const cat = categoryOf(user, config)
-  if (cat === 'Amministratore') return true
+  const adminish = user.role === 'admin' || cat === 'Amministratore'
+  if (adminish && ADMIN_SAFE.includes(perm)) return true
+  if (!config || !config.perms) return true
   return !!config.perms[cat]?.[perm]
 }

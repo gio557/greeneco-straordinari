@@ -4,10 +4,29 @@ import { defaultPermConfig, puo, categoryOf, mergeWithDefaults, PERMISSIONS } fr
 
 const cfg = defaultPermConfig()
 
-test('amministratore può tutto (anche se la config cambiasse)', () => {
+test('amministratore: di default può tutto', () => {
   const u = { id: 'a', role: 'admin', department: 'Amministratore' }
   assert.equal(puo(u, 'area.permessi', cfg), true)
   assert.equal(puo(u, 'profili.delete', cfg), true)
+  assert.equal(puo(u, 'area.cassetto', cfg), true)
+})
+
+test('amministratore: disattivare un flag NON anti-blocco ha effetto', () => {
+  const u = { id: 'a', role: 'admin', department: 'Amministratore' }
+  // L'admin disabilita "Avere il proprio Cassetto" per la categoria Amministratore.
+  const off = { ...cfg, perms: { ...cfg.perms, Amministratore: { ...cfg.perms.Amministratore, 'area.cassetto': false } } }
+  assert.equal(puo(u, 'area.cassetto', off), false) // ora viene rispettato
+  assert.equal(puo(u, 'area.permessi', off), true)  // resta accessibile
+})
+
+test('amministratore: i flag anti-blocco restano sempre attivi', () => {
+  const u = { id: 'a', role: 'admin', department: 'Amministratore' }
+  const locked = {
+    ...cfg,
+    perms: { ...cfg.perms, Amministratore: { ...cfg.perms.Amministratore, 'area.permessi': false, 'permessi.edit': false } },
+  }
+  assert.equal(puo(u, 'area.permessi', locked), true)
+  assert.equal(puo(u, 'permessi.edit', locked), true)
 })
 
 test('operativo: vede le proprie aree ma non gestione/permessi/board', () => {
