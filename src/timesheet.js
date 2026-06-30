@@ -150,6 +150,19 @@ export function buildEmployeeTimesheet(clockings, year, month0, thresholdHours) 
   }
   for (const k in verifyByDay) addNote(k, `⚠ verifica: ${[...verifyByDay[k]].join(', ')}`)
 
+  // Clienti del giorno: nomi distinti (in ordine) dalle timbrature di "lavoro".
+  // L'etichetta arriva già risolta da chi costruisce il cartellino (clientLabel),
+  // oppure è il testo libero (clientName) per i clienti non in anagrafica.
+  const clientsByDay = {}
+  for (const c of sorted) {
+    if (normalizeKind(c.kind) !== 'work') continue
+    const lab = c.clientLabel || c.clientName
+    if (!lab) continue
+    const k = localDateKey(c.punchedAt)
+    const list = (clientsByDay[k] = clientsByDay[k] || [])
+    if (!list.includes(lab)) list.push(lab)
+  }
+
   const daysInMonth = new Date(year, month0 + 1, 0).getDate()
   const rows = []
   const totals = { work: 0, travel: 0, break: 0, ordinary: 0, overtime: 0, paid: 0 }
@@ -185,6 +198,7 @@ export function buildEmployeeTimesheet(clockings, year, month0, thresholdHours) 
       start: formatTimeLocal(firstByDay[k]),
       end: formatTimeLocal(endByDay[k] || ''),
       notes: notesByDay[k] || [],
+      clients: clientsByDay[k] || [],
     })
   }
   return { rows, totals }
@@ -215,8 +229,8 @@ function csvRow(values) {
     .join(CSV_SEP)
 }
 
-function csvDataRow(r) {
-  return [
+function csvDataRow(r, includeClient) {
+  const cells = [
     r.date,
     r.weekday,
     r.start,
@@ -228,6 +242,8 @@ function csvDataRow(r) {
     hoursDecimal(r.paidHours),
     r.notes.join(' / '),
   ]
+  if (includeClient) cells.push((r.clients || []).join(', '))
+  return cells
 }
 
 function csvTotalsCells(totals) {
@@ -241,30 +257,35 @@ function csvTotalsCells(totals) {
 }
 
 // CSV di un singolo dipendente (intestazione + righe giornaliere + totali).
+// `meta.includeClient` aggiunge la colonna "Cliente".
 export function timesheetToCsv({ rows, totals }, meta) {
+  const inc = !!meta.includeClient
+  const tail = inc ? ['', ''] : [''] // colonne Note (+ Cliente) nella riga totali
   const lines = []
   lines.push(csvRow(['Dipendente', meta.employeeName]))
   lines.push(csvRow(['Mese', meta.monthLabel]))
   lines.push(csvRow(['Soglia ore ordinarie/giorno (solo lavoro)', hoursDecimal(meta.thresholdHours)]))
   lines.push('')
-  lines.push(csvRow(CSV_HEADER))
-  for (const r of rows) lines.push(csvRow(csvDataRow(r)))
-  lines.push(csvRow(['Totali', '', '', '', ...csvTotalsCells(totals), '']))
+  lines.push(csvRow(inc ? [...CSV_HEADER, 'Cliente'] : CSV_HEADER))
+  for (const r of rows) lines.push(csvRow(csvDataRow(r, inc)))
+  lines.push(csvRow(['Totali', '', '', '', ...csvTotalsCells(totals), ...tail]))
   return '\uFEFF' + lines.join('\r\n')
 }
 
 // CSV combinato di più dipendenti (colonna Dipendente + totali per persona).
 export function combinedTimesheetToCsv(perEmployee, meta) {
+  const inc = !!meta.includeClient
+  const tail = inc ? ['', ''] : ['']
   const lines = []
   lines.push(csvRow(['Mese', meta.monthLabel]))
   lines.push(csvRow(['Soglia ore ordinarie/giorno (solo lavoro)', hoursDecimal(meta.thresholdHours)]))
   lines.push('')
-  lines.push(csvRow(['Dipendente', ...CSV_HEADER]))
+  lines.push(csvRow(inc ? ['Dipendente', ...CSV_HEADER, 'Cliente'] : ['Dipendente', ...CSV_HEADER]))
   const grand = { work: 0, travel: 0, break: 0, overtime: 0, paid: 0 }
   for (const emp of perEmployee) {
-    for (const r of emp.timesheet.rows) lines.push(csvRow([emp.name, ...csvDataRow(r)]))
+    for (const r of emp.timesheet.rows) lines.push(csvRow([emp.name, ...csvDataRow(r, inc)]))
     const t = emp.timesheet.totals
-    lines.push(csvRow([`${emp.name} — TOTALE`, '', '', '', '', ...csvTotalsCells(t), '']))
+    lines.push(csvRow([`${emp.name} — TOTALE`, '', '', '', '', ...csvTotalsCells(t), ...tail]))
     lines.push('')
     grand.work += t.work
     grand.travel += t.travel
@@ -272,7 +293,7 @@ export function combinedTimesheetToCsv(perEmployee, meta) {
     grand.overtime += t.overtime
     grand.paid += t.paid
   }
-  lines.push(csvRow(['TOTALE GENERALE', '', '', '', '', ...csvTotalsCells({ ...grand, ordinary: 0 }), '']))
+  lines.push(csvRow(['TOTALE GENERALE', '', '', '', '', ...csvTotalsCells({ ...grand, ordinary: 0 }), ...tail]))
   return '\uFEFF' + lines.join('\r\n')
 }
 

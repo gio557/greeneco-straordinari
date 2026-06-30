@@ -15,6 +15,34 @@ import {
 const C = (iso, kind) => ({ employeeId: 'emp-1', kind, punchedAt: new Date(iso).toISOString() })
 const day = (rows, d) => rows.find((x) => x.date === d)
 
+test('clienti del giorno: nomi distinti dalle timbrature di lavoro', () => {
+  const clk = [
+    { ...C('2026-06-02T08:00:00+02:00', 'work'), clientLabel: 'Acme' },
+    { ...C('2026-06-02T12:00:00+02:00', 'travel') }, // il viaggio non porta cliente
+    { ...C('2026-06-02T13:00:00+02:00', 'work'), clientName: 'Beta' },
+    { ...C('2026-06-02T16:00:00+02:00', 'work'), clientLabel: 'Acme' }, // duplicato → una volta
+    { ...C('2026-06-02T18:00:00+02:00', 'end') },
+  ]
+  const { rows } = buildEmployeeTimesheet(clk, 2026, 5, 8)
+  assert.deepEqual(day(rows, '2026-06-02').clients, ['Acme', 'Beta'])
+  // un giorno senza lavoro non ha clienti
+  assert.deepEqual(day(rows, '2026-06-10').clients, [])
+})
+
+test('CSV: la colonna Cliente compare solo con includeClient', () => {
+  const clk = [
+    { ...C('2026-06-02T08:00:00+02:00', 'work'), clientLabel: 'Acme' },
+    { ...C('2026-06-02T17:00:00+02:00', 'end') },
+  ]
+  const ts = buildEmployeeTimesheet(clk, 2026, 5, 8)
+  const meta = { employeeName: 'Tizio', monthLabel: 'giugno 2026', thresholdHours: 8 }
+  const senza = timesheetToCsv(ts, meta)
+  const con = timesheetToCsv(ts, { ...meta, includeClient: true })
+  assert.ok(!senza.includes('Cliente'))
+  assert.ok(con.includes('Cliente'))
+  assert.ok(con.includes('Acme'))
+})
+
 test('viaggio-lavoro-viaggio: ore separate, nessuno straordinario', () => {
   const clk = [
     C('2026-06-02T08:00:00+02:00', 'travel'),

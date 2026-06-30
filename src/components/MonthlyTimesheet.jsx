@@ -26,7 +26,7 @@ function parseMonth(value) {
 
 // Riepilogo mensile delle presenze: una tabella per dipendente (giorno per
 // giorno) con ore ordinarie e straordinarie, scaricabile in CSV.
-export default function MonthlyTimesheet({ user, permConfig = null }) {
+export default function MonthlyTimesheet({ user, permConfig = null, showClient = false, clients = [] }) {
   const seeAll = puo(user, 'dati.tutti', permConfig)
   const canExport = puo(user, 'timbrature.export', permConfig)
   const [month, setMonth] = useState(currentMonthValue)
@@ -35,6 +35,8 @@ export default function MonthlyTimesheet({ user, permConfig = null }) {
   const [clockings, setClockings] = useState([])
   const [userMap, setUserMap] = useState({})
   const [loading, setLoading] = useState(true)
+  const [exportClient, setExportClient] = useState(false)
+  const clientsById = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c])), [clients])
 
   const { year, month0 } = parseMonth(month)
 
@@ -81,9 +83,13 @@ export default function MonthlyTimesheet({ user, permConfig = null }) {
 
   const clockingsByEmp = useMemo(() => {
     const m = {}
-    for (const c of clockings) (m[c.employeeId] = m[c.employeeId] || []).push(c)
+    for (const c of clockings) {
+      // Risolve il nome del cliente (anagrafica o testo libero) per il cartellino.
+      const clientLabel = c.clientName || clientsById[c.clientId]?.name || ''
+      ;(m[c.employeeId] = m[c.employeeId] || []).push({ ...c, clientLabel })
+    }
     return m
-  }, [clockings])
+  }, [clockings, clientsById])
 
   const timesheet = useMemo(() => {
     if (!selectedEmp) return null
@@ -99,6 +105,7 @@ export default function MonthlyTimesheet({ user, permConfig = null }) {
       employeeName: selectedName,
       monthLabel: label,
       thresholdHours: threshold,
+      includeClient: exportClient,
     })
     downloadTextFile(`cartellino_${slugify(selectedName)}_${month}.csv`, csv)
   }
@@ -108,7 +115,7 @@ export default function MonthlyTimesheet({ user, permConfig = null }) {
       name: e.name || e.id,
       timesheet: buildEmployeeTimesheet(clockingsByEmp[e.id] || [], year, month0, threshold),
     }))
-    const csv = combinedTimesheetToCsv(perEmployee, { monthLabel: label, thresholdHours: threshold })
+    const csv = combinedTimesheetToCsv(perEmployee, { monthLabel: label, thresholdHours: threshold, includeClient: exportClient })
     downloadTextFile(`cartellini_${month}.csv`, csv)
   }
 
@@ -151,6 +158,10 @@ export default function MonthlyTimesheet({ user, permConfig = null }) {
 
         {canExport && (
           <div className="ts-actions">
+            <label className="verify-filter" title="Includi la colonna Cliente nel file CSV">
+              <input type="checkbox" checked={exportClient} onChange={(e) => setExportClient(e.target.checked)} />
+              Cliente nel CSV
+            </label>
             <button className="btn-ghost" onClick={downloadOne} disabled={!timesheet}>
               ⬇ Scarica CSV
             </button>
@@ -193,6 +204,7 @@ export default function MonthlyTimesheet({ user, permConfig = null }) {
                   <th className="num">Pausa</th>
                   <th className="num">Retribuito</th>
                   <th>Note</th>
+                  {showClient && <th>Cliente</th>}
                 </tr>
               </thead>
               <tbody>
@@ -225,6 +237,11 @@ export default function MonthlyTimesheet({ user, permConfig = null }) {
                     <td data-label="Note" className="ts-notes">
                       {r.notes.length > 0 ? r.notes.join(' · ') : ''}
                     </td>
+                    {showClient && (
+                      <td data-label="Cliente" className="ts-clients">
+                        {r.clients && r.clients.length > 0 ? r.clients.join(', ') : '—'}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -239,6 +256,7 @@ export default function MonthlyTimesheet({ user, permConfig = null }) {
                   <td className="num"><strong>{hoursToHM(timesheet.totals.break)}</strong></td>
                   <td className="num"><strong>{hoursToHM(timesheet.totals.paid)}</strong></td>
                   <td></td>
+                  {showClient && <td></td>}
                 </tr>
               </tfoot>
             </table>
