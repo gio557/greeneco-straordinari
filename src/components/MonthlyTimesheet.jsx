@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { getClockingsInRange, getUserMap } from '../data/api.js'
 import {
   buildEmployeeTimesheet,
@@ -9,6 +9,10 @@ import {
   hoursDecimal,
   monthLabel,
   slugify,
+  localDateKey,
+  normalizeKind,
+  formatTimeLocal,
+  ACTIVITIES,
 } from '../timesheet.js'
 import { puo } from '../permissions.js'
 
@@ -36,6 +40,7 @@ export default function MonthlyTimesheet({ user, permConfig = null, showClient =
   const [userMap, setUserMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [exportClient, setExportClient] = useState(false)
+  const [openDay, setOpenDay] = useState(null) // giorno espanso nel cartellino
   const clientsById = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c])), [clients])
 
   const { year, month0 } = parseMonth(month)
@@ -90,6 +95,21 @@ export default function MonthlyTimesheet({ user, permConfig = null, showClient =
     }
     return m
   }, [clockings, clientsById])
+
+  // Timbrature del dipendente selezionato raggruppate per giorno (per la
+  // sotto-lista espandibile dalla riga del cartellino).
+  const dayClockings = useMemo(() => {
+    const m = {}
+    for (const c of clockingsByEmp[selectedEmp] || []) {
+      const k = localDateKey(c.punchedAt)
+      ;(m[k] = m[k] || []).push(c)
+    }
+    for (const k in m) m[k].sort((a, b) => a.punchedAt.localeCompare(b.punchedAt))
+    return m
+  }, [clockingsByEmp, selectedEmp])
+
+  // Richiudi l'eventuale giorno aperto quando si cambia dipendente o mese.
+  useEffect(() => { setOpenDay(null) }, [selectedEmp, month])
 
   const timesheet = useMemo(() => {
     if (!selectedEmp) return null
@@ -208,9 +228,18 @@ export default function MonthlyTimesheet({ user, permConfig = null, showClient =
                 </tr>
               </thead>
               <tbody>
-                {timesheet.rows.map((r) => (
-                  <tr key={r.date} className={r.isWeekend ? 'ts-weekend' : undefined}>
+                {timesheet.rows.map((r) => {
+                  const list = dayClockings[r.date] || []
+                  const has = list.length > 0
+                  const open = openDay === r.date
+                  return (
+                  <Fragment key={r.date}>
+                  <tr
+                    className={`${r.isWeekend ? 'ts-weekend' : ''}${has ? ' ts-row-click' : ''}${open ? ' ts-row-open' : ''}`}
+                    onClick={has ? () => setOpenDay(open ? null : r.date) : undefined}
+                  >
                     <td data-label="Giorno">
+                      {has && <span className="ts-caret" aria-hidden>{open ? '▾' : '▸'}</span>}
                       {r.weekday} {String(r.day).padStart(2, '0')}
                     </td>
                     <td data-label="Inizio">{r.start || '—'}</td>
@@ -243,7 +272,33 @@ export default function MonthlyTimesheet({ user, permConfig = null, showClient =
                       </td>
                     )}
                   </tr>
-                ))}
+                  {open && (
+                    <tr className="ts-detail-row">
+                      <td colSpan={showClient ? 10 : 9}>
+                        <div className="day-detail">
+                          <div className="day-detail-title">Timbrature di {r.weekday} {String(r.day).padStart(2, '0')}</div>
+                          {list.map((c) => {
+                            const act = normalizeKind(c.kind)
+                            return (
+                              <div key={c.id} className="day-detail-row">
+                                <span className="dd-time">{formatTimeLocal(c.punchedAt)}</span>
+                                <span className={`badge clock-badge ${act}`}>{ACTIVITIES[act]?.label ?? act}</span>
+                                {c.clientLabel && <span className="dd-client">🏢 {c.clientLabel}</span>}
+                                {c.lat != null ? (
+                                  <a className="clock-map" href={`https://www.openstreetmap.org/?mlat=${c.lat}&mlon=${c.lng}#map=18/${c.lat}/${c.lng}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>📍 mappa</a>
+                                ) : (
+                                  <span className="muted small">senza posizione</span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="ts-total-row">

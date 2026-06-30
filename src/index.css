@@ -1818,3 +1818,15 @@ code {
 /* Intestazioni ordinabili (riepilogo per cliente). */
 .dash-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 .dash-table th.sortable:hover { color: #fff; text-decoration: underline; }
+
+/* Cartellino: righe espandibili con la sotto-lista delle timbrature del giorno. */
+.ts-table tr.ts-row-click { cursor: pointer; }
+.ts-table tr.ts-row-click:hover td { background: #eef4fb; }
+.ts-table tr.ts-row-open td { background: #e9f1fa; }
+.ts-caret { display: inline-block; width: 14px; color: var(--muted); font-size: 11px; }
+.ts-detail-row > td { background: #f7fafd; padding: 10px 14px; }
+.day-detail { display: flex; flex-direction: column; gap: 6px; }
+.day-detail-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 2px; }
+.day-detail-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.dd-time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--navy); min-width: 44px; }
+.dd-client { background: var(--green-bg); color: var(--navy); border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 600; }
