@@ -12,6 +12,7 @@ import {
   combinedTimesheetToCsv,
   buildClientSummary,
   buildClientEmployeeHours,
+  buildWorkSegments,
 } from './timesheet.js'
 
 const C = (iso, kind) => ({ employeeId: 'emp-1', kind, punchedAt: new Date(iso).toISOString() })
@@ -71,6 +72,23 @@ test('buildClientEmployeeHours: ore per cliente suddivise per dipendente', () =>
   assert.equal(alfa.byEmp['emp-1'], 4)
   assert.equal(alfa.byEmp['emp-2'], 2)
   assert.equal(res[0].label, 'Alfa') // ordinato per ore decrescenti (6 > 3)
+})
+
+test('buildWorkSegments: durata, cliente, giorno e mese per ogni segmento di lavoro', () => {
+  const W = (iso, kind, extra = {}) => ({ employeeId: 'emp-1', kind, punchedAt: new Date(iso).toISOString(), ...extra })
+  const clk = [
+    W('2026-06-02T08:00:00+02:00', 'work', { clientId: 'c1' }), // 4h
+    W('2026-06-02T12:00:00+02:00', 'travel'),                    // ignorato (non work)
+    W('2026-06-02T13:00:00+02:00', 'work', { clientName: 'Libero' }), // 2h, cliente libero
+    W('2026-06-02T15:00:00+02:00', 'end'),
+  ]
+  const segs = buildWorkSegments(clk, (c) => (c.clientId === 'c1' ? 'Alfa' : null))
+  assert.equal(segs.length, 2)
+  assert.equal(segs[0].clientLabel, 'Alfa')
+  assert.equal(Math.round(segs[0].hours), 4)
+  assert.equal(segs[0].month, '2026-06')
+  assert.equal(segs[1].clientKey, 'free:Libero')
+  assert.equal(segs[1].clientLabel, 'Libero')
 })
 
 test('CSV: la colonna Cliente compare solo con includeClient', () => {
