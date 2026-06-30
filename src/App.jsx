@@ -253,7 +253,7 @@ export default function App() {
     return (
       <div className="app app-wide">
         <Header user={user} onLogout={handleLogout} onBack={backToHub} />
-        <PagheCassetti user={user} />
+        <PagheCassetti user={user} permConfig={permConfig} />
       </div>
     )
   }

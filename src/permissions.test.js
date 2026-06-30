@@ -80,6 +80,41 @@ test('clienti.manage: di default per Amministratore/CEO/Responsabile/Commerciale
   assert.equal(puo(op, 'clienti.manage', cfg), false)
 })
 
+test('cedolini: strada autorizzativa indipendente (view per i dipendenti, manage per le paghe)', () => {
+  const op = { id: 'o', role: 'employee', department: 'Operativo' }
+  const paghe = { id: 'p', role: 'paghe', department: 'Ufficio paghe' }
+  const amm = { id: 'a', role: 'admin', department: 'Amministratore' }
+  // Di default ogni dipendente con il cassetto vede i propri cedolini…
+  assert.equal(puo(op, 'cedolini.view', cfg), true)
+  // …ma non può caricarli/gestirli.
+  assert.equal(puo(op, 'cedolini.manage', cfg), false)
+  // L'ufficio paghe può vederli e gestirli.
+  assert.equal(puo(paghe, 'cedolini.view', cfg), true)
+  assert.equal(puo(paghe, 'cedolini.manage', cfg), true)
+  // L'amministratore (di default) può tutto.
+  assert.equal(puo(amm, 'cedolini.view', cfg), true)
+  assert.equal(puo(amm, 'cedolini.manage', cfg), true)
+})
+
+test('cedolini: l\'accesso si può disattivare indipendentemente dal cassetto', () => {
+  // Spegnere "cedolini.view" non tocca "area.cassetto" (e viceversa).
+  const op = { id: 'o', role: 'employee', department: 'Operativo' }
+  const noCedolini = {
+    ...cfg,
+    perms: { ...cfg.perms, Operativo: { ...cfg.perms.Operativo, 'cedolini.view': false } },
+  }
+  assert.equal(puo(op, 'cedolini.view', noCedolini), false)
+  assert.equal(puo(op, 'area.cassetto', noCedolini), true) // il resto del cassetto resta
+  // Spegnere la gestione per le paghe lascia comunque la visione.
+  const paghe = { id: 'p', role: 'paghe', department: 'Ufficio paghe' }
+  const noManage = {
+    ...cfg,
+    perms: { ...cfg.perms, 'Ufficio paghe': { ...cfg.perms['Ufficio paghe'], 'cedolini.manage': false } },
+  }
+  assert.equal(puo(paghe, 'cedolini.manage', noManage), false)
+  assert.equal(puo(paghe, 'cedolini.view', noManage), true)
+})
+
 test('mergeWithDefaults: riempie i flag mancanti senza alterare quelli espliciti', () => {
   // Config "vecchia": Commerciale senza il flag clienti.manage, e con un flag
   // esplicitamente disattivato che NON deve essere riacceso.

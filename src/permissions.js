@@ -28,6 +28,8 @@ export const PERMISSIONS = [
   { group: 'Multe', key: 'multe.manage', label: 'Registrare e gestire le multe' },
   { group: 'Multe', key: 'multe.cancel', label: 'Annullare le multe' },
   { group: 'Cassetto', key: 'area.cassetto', label: 'Avere il proprio Cassetto' },
+  { group: 'Cassetto', key: 'cedolini.view', label: 'Accedere ai cedolini (propri o dei dipendenti)' },
+  { group: 'Cassetto', key: 'cedolini.manage', label: 'Caricare/gestire i cedolini' },
   { group: 'Cassetto', key: 'cassetti.manage', label: 'Gestire i cassetti dei dipendenti' },
   { group: 'Profili', key: 'area.utenti', label: 'Vedere la gestione utenti' },
   { group: 'Profili', key: 'profili.create', label: 'Creare/modificare profili' },
@@ -45,7 +47,7 @@ const EMPLOYEE_LIKE = [
   'area.timbrature', 'timbrature.timbra',
   'area.straordinari', 'straordinari.create',
   'area.automezzi', 'automezzi.handover',
-  'area.cassetto', 'multe.view_own',
+  'area.cassetto', 'cedolini.view', 'multe.view_own',
 ]
 
 function permsFrom(keys) {
@@ -68,7 +70,7 @@ export function defaultPermConfig() {
         'multe.view_own', 'multe.manage', 'multe.cancel',
         'clienti.manage',
       ]),
-      'Ufficio paghe': permsFrom([...EMPLOYEE_LIKE, 'cassetti.manage']),
+      'Ufficio paghe': permsFrom([...EMPLOYEE_LIKE, 'cassetti.manage', 'cedolini.manage']),
       'Ufficio Tecnico': permsFrom(EMPLOYEE_LIKE),
       'Operativo': permsFrom(EMPLOYEE_LIKE),
       'Commerciale': permsFrom([...EMPLOYEE_LIKE, 'clienti.manage']),

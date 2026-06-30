@@ -6,6 +6,7 @@ import {
 import { useLiveData } from '../data/useLiveData.js'
 import { DOC_KINDS } from '../documents.js'
 import { initials } from '../utils.js'
+import { puo } from '../permissions.js'
 import FineAttachment from './FineAttachment.jsx'
 import FineForm from './FineForm.jsx'
 
@@ -17,7 +18,7 @@ function fmtDate(d) {
 // Gestione documenti per l'ufficio paghe (e admin): si sceglie il dipendente,
 // poi si caricano/gestiscono i suoi Cedolini e Sanzioni Disciplinari. Il
 // destinatario è sempre in evidenza per evitare errori di attribuzione.
-export default function PagheCassetti({ user }) {
+export default function PagheCassetti({ user, permConfig = null }) {
   const [userMap, setUserMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
@@ -35,7 +36,7 @@ export default function PagheCassetti({ user }) {
 
   if (selected) {
     const emp = userMap[selected]
-    return <EmployeeDrawer user={user} employeeId={selected} name={emp?.name || selected} onBack={() => setSelected(null)} />
+    return <EmployeeDrawer user={user} permConfig={permConfig} employeeId={selected} name={emp?.name || selected} onBack={() => setSelected(null)} />
   }
 
   return (
@@ -64,7 +65,9 @@ export default function PagheCassetti({ user }) {
   )
 }
 
-function EmployeeDrawer({ user, employeeId, name, onBack }) {
+function EmployeeDrawer({ user, permConfig, employeeId, name, onBack }) {
+  const canViewCedolini = puo(user, 'cedolini.view', permConfig)
+  const canManageCedolini = puo(user, 'cedolini.manage', permConfig)
   const [docs, setDocs] = useState([])
   const [urls, setUrls] = useState({})
   const [loading, setLoading] = useState(true)
@@ -103,11 +106,17 @@ function EmployeeDrawer({ user, employeeId, name, onBack }) {
       </div>
 
       {['cedolino', 'disciplinare'].map((kind) => {
+        // I cedolini hanno una strada autorizzativa indipendente: la sezione è
+        // visibile solo con `cedolini.view` e il caricamento/eliminazione solo
+        // con `cedolini.manage`. Le sanzioni disciplinari seguono la gestione
+        // generica del cassetto (chi è qui ha già `cassetti.manage`).
+        if (kind === 'cedolino' && !canViewCedolini) return null
+        const canManage = kind === 'cedolino' ? canManageCedolini : true
         const list = docs.filter((d) => d.kind === kind)
         return (
           <section key={kind} className="drawer-section">
             <h3 className="mini-title">{DOC_KINDS[kind].plural}</h3>
-            <AddDocForm employeeId={employeeId} kind={kind} user={user} name={name} onAdded={refresh} />
+            {canManage && <AddDocForm employeeId={employeeId} kind={kind} user={user} name={name} onAdded={refresh} />}
             {loading ? (
               <p className="muted center">Caricamento…</p>
             ) : list.length === 0 ? (
@@ -126,9 +135,11 @@ function EmployeeDrawer({ user, employeeId, name, onBack }) {
                         {d.acknowledgedAt ? `Presa visione il ${fmtDate(d.acknowledgedAt)}` : 'In attesa di presa visione'}
                       </p>
                     )}
-                    <div className="decision-actions">
-                      <button className="btn-ghost btn-sm danger" onClick={() => remove(d)}>Elimina</button>
-                    </div>
+                    {canManage && (
+                      <div className="decision-actions">
+                        <button className="btn-ghost btn-sm danger" onClick={() => remove(d)}>Elimina</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

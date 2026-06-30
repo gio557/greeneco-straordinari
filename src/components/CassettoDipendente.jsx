@@ -27,7 +27,12 @@ const TILES = [
 // (ogni sotto-vista interroga con il proprio user.id).
 export default function CassettoDipendente({ user, initialSub = null, onChangeFines, permConfig = null }) {
   const canSeeMulte = puo(user, 'multe.view_own', permConfig)
-  const tiles = TILES.filter((t) => t.key !== 'multe' || canSeeMulte)
+  const canSeeCedolini = puo(user, 'cedolini.view', permConfig)
+  const tiles = TILES.filter((t) => {
+    if (t.key === 'multe') return canSeeMulte
+    if (t.key === 'cedolini') return canSeeCedolini
+    return true
+  })
   const [sub, setSub] = useState(initialSub)
   const back = (
     <button className="back-link" onClick={() => setSub(null)}>‹ Cassetto del dipendente</button>
@@ -41,11 +46,19 @@ export default function CassettoDipendente({ user, initialSub = null, onChangeFi
       </>
     )
   }
-  if (sub === 'cedolini' || sub === 'disciplinari') {
+  if (sub === 'cedolini' && canSeeCedolini) {
     return (
       <main className="content">
         {back}
-        <DocumentList user={user} kind={sub === 'cedolini' ? 'cedolino' : 'disciplinare'} />
+        <DocumentList user={user} kind="cedolino" />
+      </main>
+    )
+  }
+  if (sub === 'disciplinari') {
+    return (
+      <main className="content">
+        {back}
+        <DocumentList user={user} kind="disciplinare" />
       </main>
     )
   }
