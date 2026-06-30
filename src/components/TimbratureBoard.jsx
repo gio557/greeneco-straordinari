@@ -7,6 +7,7 @@ import { normalizeKind, ACTIVITIES } from '../timesheet.js'
 import { clockingChecks, isToVerify } from '../clockingFlags.js'
 import MonthlyTimesheet from './MonthlyTimesheet.jsx'
 import ClientSummary from './ClientSummary.jsx'
+import TimbratureCharts from './TimbratureCharts.jsx'
 
 const STATE_LABEL = { travel: 'In viaggio', work: 'Al lavoro', break: 'In pausa' }
 
@@ -92,7 +93,13 @@ export default function TimbratureBoard({ user, permConfig = null }) {
         >
           Per cliente
         </button>
-        {view !== 'clients' && (
+        <button
+          className={view === 'charts' ? 'dash-tab dash-tab-active' : 'dash-tab'}
+          onClick={() => setView('charts')}
+        >
+          Grafici
+        </button>
+        {view !== 'clients' && view !== 'charts' && (
           <label className="verify-filter board-client-toggle" title="Mostra la colonna Cliente">
             <input type="checkbox" checked={showClient} onChange={(e) => setShowClient(e.target.checked)} />
             Mostra cliente
@@ -100,7 +107,9 @@ export default function TimbratureBoard({ user, permConfig = null }) {
         )}
       </div>
 
-      {view === 'clients' ? (
+      {view === 'charts' ? (
+        <TimbratureCharts user={user} permConfig={permConfig} clients={clients} />
+      ) : view === 'clients' ? (
         <ClientSummary user={user} permConfig={permConfig} clients={clients} />
       ) : view === 'month' ? (
         <MonthlyTimesheet user={user} permConfig={permConfig} showClient={showClient} clients={clients} />

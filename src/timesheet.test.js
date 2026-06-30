@@ -11,6 +11,7 @@ import {
   timesheetToCsv,
   combinedTimesheetToCsv,
   buildClientSummary,
+  buildClientEmployeeHours,
 } from './timesheet.js'
 
 const C = (iso, kind) => ({ employeeId: 'emp-1', kind, punchedAt: new Date(iso).toISOString() })
@@ -52,6 +53,24 @@ test('buildClientSummary: ore di lavoro per cliente, ordinate per ore', () => {
   assert.deepEqual(sum[0].employees.sort(), ['emp-1', 'emp-2'])
   const beta = sum.find((r) => r.label === 'Beta')
   assert.equal(hoursToHM(beta.hours), '2:00')
+})
+
+test('buildClientEmployeeHours: ore per cliente suddivise per dipendente', () => {
+  const W = (emp, iso, kind, extra = {}) => ({ employeeId: emp, kind, punchedAt: new Date(iso).toISOString(), ...extra })
+  const clk = [
+    W('emp-1', '2026-06-02T08:00:00+02:00', 'work', { clientId: 'c1' }), // 4h c1 emp-1
+    W('emp-1', '2026-06-02T12:00:00+02:00', 'end'),
+    W('emp-2', '2026-06-02T08:00:00+02:00', 'work', { clientId: 'c1' }), // 2h c1 emp-2
+    W('emp-2', '2026-06-02T10:00:00+02:00', 'work', { clientId: 'c2' }), // 3h c2 emp-2
+    W('emp-2', '2026-06-02T13:00:00+02:00', 'end'),
+  ]
+  const label = (c) => ({ c1: 'Alfa', c2: 'Beta' }[c.clientId])
+  const res = buildClientEmployeeHours(clk, label)
+  const alfa = res.find((r) => r.label === 'Alfa')
+  assert.equal(alfa.total, 6) // 4 + 2
+  assert.equal(alfa.byEmp['emp-1'], 4)
+  assert.equal(alfa.byEmp['emp-2'], 2)
+  assert.equal(res[0].label, 'Alfa') // ordinato per ore decrescenti (6 > 3)
 })
 
 test('CSV: la colonna Cliente compare solo con includeClient', () => {

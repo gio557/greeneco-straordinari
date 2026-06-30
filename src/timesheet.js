@@ -336,6 +336,33 @@ export function buildClientSummary(clockings, resolveLabel) {
     .sort((x, y) => y.hours - x.hours)
 }
 
+// Ore di LAVORO per cliente, suddivise per dipendente (per i grafici).
+// Ritorna un array ordinato per ore decrescenti:
+//   { key, label, total, byEmp: { [employeeId]: hours } }
+export function buildClientEmployeeHours(clockings, resolveLabel) {
+  const byEmp = {}
+  for (const c of clockings) (byEmp[c.employeeId] = byEmp[c.employeeId] || []).push(c)
+  const acc = {}
+  for (const empId in byEmp) {
+    const sorted = byEmp[empId].slice().sort((a, b) => a.punchedAt.localeCompare(b.punchedAt))
+    for (let i = 0; i < sorted.length; i++) {
+      const cur = sorted[i]
+      if (normalizeKind(cur.kind) !== 'work') continue
+      const key = cur.clientId || (cur.clientName ? `free:${cur.clientName}` : null)
+      if (!key) continue
+      const next = sorted[i + 1]
+      const ms = next ? Date.parse(next.punchedAt) - Date.parse(cur.punchedAt) : 0
+      if (ms <= 0) continue
+      const h = ms / MS_PER_HOUR
+      const a = (acc[key] = acc[key] || { key, label: resolveLabel(cur) || cur.clientName || '—', total: 0, byEmp: {} })
+      a.label = resolveLabel(cur) || a.label
+      a.total += h
+      a.byEmp[empId] = (a.byEmp[empId] || 0) + h
+    }
+  }
+  return Object.values(acc).sort((x, y) => y.total - x.total)
+}
+
 // CSV del riepilogo per cliente. `nameOf(id)` risolve il nome del dipendente.
 export function clientSummaryToCsv(summary, meta, nameOf = (id) => id) {
   const lines = []
