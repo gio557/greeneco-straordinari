@@ -10,6 +10,7 @@ import {
   hoursDecimal,
   timesheetToCsv,
   combinedTimesheetToCsv,
+  buildClientSummary,
 } from './timesheet.js'
 
 const C = (iso, kind) => ({ employeeId: 'emp-1', kind, punchedAt: new Date(iso).toISOString() })
@@ -27,6 +28,30 @@ test('clienti del giorno: nomi distinti dalle timbrature di lavoro', () => {
   assert.deepEqual(day(rows, '2026-06-02').clients, ['Acme', 'Beta'])
   // un giorno senza lavoro non ha clienti
   assert.deepEqual(day(rows, '2026-06-10').clients, [])
+})
+
+test('buildClientSummary: ore di lavoro per cliente, ordinate per ore', () => {
+  const W = (emp, iso, kind, extra = {}) => ({ employeeId: emp, kind, punchedAt: new Date(iso).toISOString(), ...extra })
+  const clk = [
+    // emp-1: 4h Acme + 2h Beta
+    W('emp-1', '2026-06-02T08:00:00+02:00', 'work', { clientId: 'cli-1' }),
+    W('emp-1', '2026-06-02T12:00:00+02:00', 'work', { clientId: 'cli-2' }),
+    W('emp-1', '2026-06-02T14:00:00+02:00', 'end'),
+    // emp-2: 3h Acme (testo libero con stesso id no → diverso)
+    W('emp-2', '2026-06-03T09:00:00+02:00', 'work', { clientId: 'cli-1' }),
+    W('emp-2', '2026-06-03T12:00:00+02:00', 'end'),
+    // viaggio senza cliente: ignorato
+    W('emp-2', '2026-06-03T08:00:00+02:00', 'travel'),
+  ]
+  const label = (c) => ({ 'cli-1': 'Acme', 'cli-2': 'Beta' }[c.clientId] || c.clientName)
+  const sum = buildClientSummary(clk, label)
+  assert.equal(sum[0].label, 'Acme') // 4+3 = 7h, primo
+  assert.equal(hoursToHM(sum[0].hours), '7:00')
+  assert.equal(sum[0].sessions, 2)
+  assert.equal(sum[0].days, 2)
+  assert.deepEqual(sum[0].employees.sort(), ['emp-1', 'emp-2'])
+  const beta = sum.find((r) => r.label === 'Beta')
+  assert.equal(hoursToHM(beta.hours), '2:00')
 })
 
 test('CSV: la colonna Cliente compare solo con includeClient', () => {

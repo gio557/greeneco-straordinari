@@ -1814,3 +1814,7 @@ code {
 /* Toggle "Mostra cliente" allineato a destra nella barra schede presenze. */
 .board-client-toggle { margin-left: auto; }
 .ts-clients { font-size: 13px; color: var(--navy); }
+
+/* Intestazioni ordinabili (riepilogo per cliente). */
+.dash-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.dash-table th.sortable:hover { color: #fff; text-decoration: underline; }

@@ -297,6 +297,57 @@ export function combinedTimesheetToCsv(perEmployee, meta) {
   return '\uFEFF' + lines.join('\r\n')
 }
 
+// --- Riepilogo per cliente --------------------------------------------------
+
+// Aggrega le ore di LAVORO per cliente. Per ogni dipendente si percorrono le
+// timbrature in ordine: la durata di un segmento di "lavoro" (fino alla
+// timbratura successiva) è attribuita al cliente di quel segmento.
+// `resolveLabel(clocking)` restituisce il nome visibile del cliente.
+// Ritorna un array ordinato per ore decrescenti, con:
+//   { key, label, hours, sessions, days, employees: string[] }
+export function buildClientSummary(clockings, resolveLabel) {
+  const byEmp = {}
+  for (const c of clockings) (byEmp[c.employeeId] = byEmp[c.employeeId] || []).push(c)
+
+  const acc = {} // key -> aggregato
+  for (const empId in byEmp) {
+    const sorted = byEmp[empId].slice().sort((a, b) => a.punchedAt.localeCompare(b.punchedAt))
+    for (let i = 0; i < sorted.length; i++) {
+      const cur = sorted[i]
+      if (normalizeKind(cur.kind) !== 'work') continue
+      const key = cur.clientId || (cur.clientName ? `free:${cur.clientName}` : null)
+      if (!key) continue
+      const label = resolveLabel(cur) || cur.clientName || '—'
+      const a = (acc[key] = acc[key] || { key, label, hours: 0, sessions: 0, employees: new Set(), days: new Set() })
+      a.label = label
+      a.sessions += 1
+      a.employees.add(empId)
+      a.days.add(localDateKey(cur.punchedAt))
+      const next = sorted[i + 1]
+      if (next) {
+        const ms = Date.parse(next.punchedAt) - Date.parse(cur.punchedAt)
+        if (ms > 0) a.hours += ms / MS_PER_HOUR
+      }
+    }
+  }
+
+  return Object.values(acc)
+    .map((a) => ({ key: a.key, label: a.label, hours: a.hours, sessions: a.sessions, days: a.days.size, employees: [...a.employees] }))
+    .sort((x, y) => y.hours - x.hours)
+}
+
+// CSV del riepilogo per cliente. `nameOf(id)` risolve il nome del dipendente.
+export function clientSummaryToCsv(summary, meta, nameOf = (id) => id) {
+  const lines = []
+  lines.push(csvRow(['Mese', meta.monthLabel]))
+  lines.push('')
+  lines.push(csvRow(['Cliente', 'Ore lavorate', 'Interventi', 'Giorni', 'Dipendenti']))
+  for (const r of summary) {
+    lines.push(csvRow([r.label, hoursDecimal(r.hours), r.sessions, r.days, r.employees.map(nameOf).join(', ')]))
+  }
+  return '﻿' + lines.join('\r\n')
+}
+
 export function slugify(text) {
   return String(text)
     .normalize('NFD')

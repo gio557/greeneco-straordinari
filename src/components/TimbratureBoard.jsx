@@ -6,6 +6,7 @@ import { formatDateTime } from '../utils.js'
 import { normalizeKind, ACTIVITIES } from '../timesheet.js'
 import { clockingChecks, isToVerify } from '../clockingFlags.js'
 import MonthlyTimesheet from './MonthlyTimesheet.jsx'
+import ClientSummary from './ClientSummary.jsx'
 
 const STATE_LABEL = { travel: 'In viaggio', work: 'Al lavoro', break: 'In pausa' }
 
@@ -85,13 +86,23 @@ export default function TimbratureBoard({ user, permConfig = null }) {
         >
           Riepilogo mensile
         </button>
-        <label className="verify-filter board-client-toggle" title="Mostra la colonna Cliente">
-          <input type="checkbox" checked={showClient} onChange={(e) => setShowClient(e.target.checked)} />
-          Mostra cliente
-        </label>
+        <button
+          className={view === 'clients' ? 'dash-tab dash-tab-active' : 'dash-tab'}
+          onClick={() => setView('clients')}
+        >
+          Per cliente
+        </button>
+        {view !== 'clients' && (
+          <label className="verify-filter board-client-toggle" title="Mostra la colonna Cliente">
+            <input type="checkbox" checked={showClient} onChange={(e) => setShowClient(e.target.checked)} />
+            Mostra cliente
+          </label>
+        )}
       </div>
 
-      {view === 'month' ? (
+      {view === 'clients' ? (
+        <ClientSummary user={user} permConfig={permConfig} clients={clients} />
+      ) : view === 'month' ? (
         <MonthlyTimesheet user={user} permConfig={permConfig} showClient={showClient} clients={clients} />
       ) : (
       <div className="board">
