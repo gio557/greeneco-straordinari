@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { getRecentClockings, getUserMap, subscribeToClockings } from '../data/api.js'
+import { useEffect, useMemo, useState } from 'react'
+import { getRecentClockings, getUserMap, subscribeToClockings, listClients } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { puo } from '../permissions.js'
 import { formatDateTime } from '../utils.js'
@@ -19,6 +19,17 @@ export default function TimbratureBoard({ user, permConfig = null }) {
   const [userMap, setUserMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [onlyToVerify, setOnlyToVerify] = useState(false)
+  const [showClient, setShowClient] = useState(false)
+  const [clients, setClients] = useState([])
+
+  // Anagrafica clienti, per risolvere il nome dal cliente registrato.
+  useEffect(() => {
+    let alive = true
+    listClients().then((c) => alive && setClients(c)).catch(() => {})
+    return () => { alive = false }
+  }, [])
+  const clientsById = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c])), [clients])
+  const clientLabel = (c) => c.clientName || clientsById[c.clientId]?.name || ''
 
   async function refresh(showSpinner = false) {
     if (showSpinner) setLoading(true)
@@ -74,10 +85,14 @@ export default function TimbratureBoard({ user, permConfig = null }) {
         >
           Riepilogo mensile
         </button>
+        <label className="verify-filter board-client-toggle" title="Mostra la colonna Cliente">
+          <input type="checkbox" checked={showClient} onChange={(e) => setShowClient(e.target.checked)} />
+          Mostra cliente
+        </label>
       </div>
 
       {view === 'month' ? (
-        <MonthlyTimesheet user={user} permConfig={permConfig} />
+        <MonthlyTimesheet user={user} permConfig={permConfig} showClient={showClient} clients={clients} />
       ) : (
       <div className="board">
         <div className="stat-grid">
@@ -96,7 +111,10 @@ export default function TimbratureBoard({ user, permConfig = null }) {
               return (
                 <div key={c.employeeId} className="card clock-row">
                   <span className={`badge clock-badge ${act}`}>{STATE_LABEL[act] ?? act}</span>
-                  <span className="clock-row-time"><strong>{name(c.employeeId)}</strong> · dalle {formatDateTime(c.punchedAt)}</span>
+                  <span className="clock-row-time">
+                    <strong>{name(c.employeeId)}</strong> · dalle {formatDateTime(c.punchedAt)}
+                    {showClient && clientLabel(c) && <span className="clock-client">🏢 {clientLabel(c)}</span>}
+                  </span>
                   {c.lat != null && (
                     <a className="clock-map" href={`https://www.google.com/maps?q=${c.lat},${c.lng}`} target="_blank" rel="noreferrer">📍 mappa</a>
                   )}
@@ -125,7 +143,7 @@ export default function TimbratureBoard({ user, permConfig = null }) {
           <div className="table-wrap">
             <table className="dash-table">
               <thead>
-                <tr><th>Dipendente</th><th>Attività</th><th>Quando</th><th>Posizione</th><th>Verifica</th></tr>
+                <tr><th>Dipendente</th><th>Attività</th>{showClient && <th>Cliente</th>}<th>Quando</th><th>Posizione</th><th>Verifica</th></tr>
               </thead>
               <tbody>
                 {rows.slice(0, 100).map((c) => {
@@ -137,6 +155,7 @@ export default function TimbratureBoard({ user, permConfig = null }) {
                     <td data-label="Attività">
                       <span className={`badge clock-badge ${act}`}>{ACTIVITIES[act]?.label ?? act}</span>
                     </td>
+                    {showClient && <td data-label="Cliente">{clientLabel(c) || '—'}</td>}
                     <td data-label="Quando">{formatDateTime(c.punchedAt)}</td>
                     <td data-label="Posizione">
                       {c.lat != null ? (
