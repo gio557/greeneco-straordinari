@@ -363,6 +363,37 @@ export function buildClientEmployeeHours(clockings, resolveLabel) {
   return Object.values(acc).sort((x, y) => y.total - x.total)
 }
 
+// Estrae i singoli SEGMENTI di lavoro (utile ai grafici, anche filtrati per
+// cliente). Per ogni timbratura di "lavoro" calcola la durata fino alla
+// successiva e ne riporta cliente, giorno e ore.
+// Ritorna: [{ empId, clientKey, clientLabel, day, month, hours }]
+export function buildWorkSegments(clockings, resolveLabel) {
+  const byEmp = {}
+  for (const c of clockings) (byEmp[c.employeeId] = byEmp[c.employeeId] || []).push(c)
+  const segs = []
+  for (const empId in byEmp) {
+    const sorted = byEmp[empId].slice().sort((a, b) => a.punchedAt.localeCompare(b.punchedAt))
+    for (let i = 0; i < sorted.length; i++) {
+      const cur = sorted[i]
+      if (normalizeKind(cur.kind) !== 'work') continue
+      const next = sorted[i + 1]
+      const ms = next ? Date.parse(next.punchedAt) - Date.parse(cur.punchedAt) : 0
+      if (ms <= 0) continue
+      const clientKey = cur.clientId || (cur.clientName ? `free:${cur.clientName}` : null)
+      const day = localDateKey(cur.punchedAt)
+      segs.push({
+        empId,
+        clientKey,
+        clientLabel: clientKey ? (resolveLabel ? resolveLabel(cur) : '') || cur.clientName || '—' : null,
+        day,
+        month: day.slice(0, 7),
+        hours: ms / MS_PER_HOUR,
+      })
+    }
+  }
+  return segs
+}
+
 // CSV del riepilogo per cliente. `nameOf(id)` risolve il nome del dipendente.
 export function clientSummaryToCsv(summary, meta, nameOf = (id) => id) {
   const lines = []
