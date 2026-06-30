@@ -1,11 +1,13 @@
-import { useState } from 'react'
-import { getLastClocking, getMyClockings, createClocking, subscribeToClockings } from '../data/api.js'
+import { useEffect, useState } from 'react'
+import { getLastClocking, getMyClockings, createClocking, subscribeToClockings, listClients } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { puo } from '../permissions.js'
+import { nearestClients } from '../geo.js'
 import { requestIpCheck } from '../data/ipCheck.js'
 import { formatDateTime } from '../utils.js'
 import { normalizeKind, ACTIVITIES } from '../timesheet.js'
 import PrivacyNotice from './PrivacyNotice.jsx'
+import ClientPicker from './ClientPicker.jsx'
 
 const consentKey = (userId) => `timbra_consent_${userId}`
 
@@ -92,6 +94,18 @@ export default function Timbrature({ user, permConfig = null }) {
     try { return Boolean(localStorage.getItem(consentKey(user.id))) } catch { return false }
   })
   const [showNotice, setShowNotice] = useState(false)
+  const [clients, setClients] = useState([])
+  const [picker, setPicker] = useState(null) // { pos, candidates } durante l'inizio lavoro
+
+  // Anagrafica clienti (per il riconoscimento via GPS e il menu a tendina).
+  useEffect(() => {
+    let alive = true
+    listClients().then((c) => alive && setClients(c)).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  const clientsById = Object.fromEntries(clients.map((c) => [c.id, c]))
+  const clientLabel = (c) => c.clientName || clientsById[c.clientId]?.name || (c.clientId ? 'cliente' : '')
 
   async function refresh(showSpinner = false) {
     if (showSpinner) setLoading(true)
@@ -112,23 +126,39 @@ export default function Timbrature({ user, permConfig = null }) {
   const actions = ACTIONS[state]
   const pendingCount = mine.filter((c) => c.pending).length
 
-  async function punch(kind) {
+  // Registra effettivamente la timbratura (eventualmente con il cliente scelto).
+  async function doPunch(kind, pos, clientPayload = {}) {
     setBusy(true)
     setError('')
-    setPhase('locating')
     try {
-      const pos = await getPosition()
-      setPhase('')
-      const saved = await createClocking({ employeeId: user.id, kind, ...(pos || {}) })
+      const saved = await createClocking({ employeeId: user.id, kind, ...(pos || {}), ...clientPayload })
       // Cross-check GPS↔IP (best-effort) solo per timbrature online con posizione.
       if (saved && !saved.pending && saved.lat != null) requestIpCheck(saved)
       await refresh()
     } catch (err) {
       setError(err.message || 'Timbratura non riuscita.')
     } finally {
-      setPhase('')
       setBusy(false)
     }
+  }
+
+  async function punch(kind) {
+    setBusy(true)
+    setError('')
+    setPhase('locating')
+    let pos = null
+    try {
+      pos = await getPosition()
+    } catch { /* posizione non disponibile: si procede senza */ }
+    setPhase('')
+    // All'inizio lavoro, se ci sono clienti in anagrafica, proponi la scelta
+    // (riconoscendo dalla posizione i più vicini). Il cliente è facoltativo.
+    if (kind === 'work' && clients.length > 0) {
+      setBusy(false)
+      setPicker({ pos, candidates: nearestClients(clients, pos?.lat, pos?.lng) })
+      return
+    }
+    await doPunch(kind, pos)
   }
 
   // Gate consenso: prima della prima timbratura serve l'informativa.
@@ -201,7 +231,10 @@ export default function Timbrature({ user, permConfig = null }) {
                 <span className={`badge clock-badge ${act}`}>
                   {ACTIVITY_ICON[act]} {ACTIVITIES[act]?.label ?? act}
                 </span>
-                <span className="clock-row-time">{formatDateTime(c.punchedAt)}</span>
+                <span className="clock-row-time">
+                  {formatDateTime(c.punchedAt)}
+                  {clientLabel(c) && <span className="clock-client">🏢 {clientLabel(c)}</span>}
+                </span>
                 {c.pending ? (
                   <span className="clock-pending">⏳ da inviare</span>
                 ) : c.lat != null ? (
@@ -213,6 +246,19 @@ export default function Timbrature({ user, permConfig = null }) {
             )
           })}
         </div>
+      )}
+
+      {picker && (
+        <ClientPicker
+          candidates={picker.candidates}
+          clients={clients}
+          onCancel={() => setPicker(null)}
+          onConfirm={(payload) => {
+            const pos = picker.pos
+            setPicker(null)
+            doPunch('work', pos, payload)
+          }}
+        />
       )}
     </main>
   )

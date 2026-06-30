@@ -155,6 +155,8 @@ export function makeResilientClockings(remote, options = {}) {
       lat: payload.lat ?? null,
       lng: payload.lng ?? null,
       accuracy: payload.accuracy ?? null,
+      clientId: payload.clientId ?? null,
+      clientName: payload.clientName ?? null,
       punchedAt: ts, // ora del TOCCO, non della sincronizzazione
       deviceTime: ts,
     }

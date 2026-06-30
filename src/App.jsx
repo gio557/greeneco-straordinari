@@ -15,6 +15,7 @@ import TimbratureBoard from './components/TimbratureBoard.jsx'
 import CassettoDipendente from './components/CassettoDipendente.jsx'
 import PagheCassetti from './components/PagheCassetti.jsx'
 import PermessiPage from './components/PermessiPage.jsx'
+import ClientsAdmin from './components/ClientsAdmin.jsx'
 import FineNoticeModal from './components/FineNoticeModal.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
@@ -201,6 +202,17 @@ export default function App() {
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
         <main className="content dashboard">
           <PermessiPage user={user} />
+        </main>
+      </div>
+    )
+  }
+
+  if (area === 'clienti' && puo(user, 'clienti.manage', permConfig)) {
+    return (
+      <div className="app app-wide">
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
+        <main className="content dashboard">
+          <ClientsAdmin />
         </main>
       </div>
     )

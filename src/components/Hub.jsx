@@ -50,11 +50,20 @@ function ShieldKeyIcon() {
     </svg>
   )
 }
+function ClientsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 9.5 5.5 4h13L20 9.5" /><path d="M4 9.5h16V20H4z" />
+      <path d="M9.5 20v-5h5v5" /><path d="M4 9.5a2.4 2.4 0 0 0 4 0 2.4 2.4 0 0 0 4 0 2.4 2.4 0 0 0 4 0 2.4 2.4 0 0 0 4 0" />
+    </svg>
+  )
+}
 
 // Hub delle aree: dopo l'accesso, l'utente sceglie in quale macro-area entrare.
 export default function Hub({ onSelect, user, onLogout, finesPending = 0, onOpenFines, permConfig = null }) {
   const can = (perm) => puo(user, perm, permConfig)
-  const showAdminSection = can('area.utenti') || can('area.permessi')
+  const showAdminSection = can('area.utenti') || can('area.permessi') || can('clienti.manage')
   return (
     <div className="hub">
       {user && (
@@ -138,6 +147,20 @@ export default function Hub({ onSelect, user, onLogout, finesPending = 0, onOpen
               <span className="area-text">
                 <span className="area-title">Gestione utenti</span>
                 <span className="area-sub">Crea e modifica utenti, ID e password</span>
+              </span>
+              <span className="area-arrow" aria-hidden>›</span>
+            </button>
+          )}
+          {can('clienti.manage') && (
+            <button
+              className="area-card admin-card"
+              style={{ '--accent': '#1f7a8c' }}
+              onClick={() => onSelect('clienti')}
+            >
+              <span className="area-icon"><ClientsIcon /></span>
+              <span className="area-text">
+                <span className="area-title">Anagrafica clienti</span>
+                <span className="area-sub">Ragione sociale, indirizzo e posizione dei clienti</span>
               </span>
               <span className="area-arrow" aria-hidden>›</span>
             </button>

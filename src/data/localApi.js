@@ -7,10 +7,10 @@
 // collegare il database centrale.
 // ---------------------------------------------------------------------------
 
-import { USERS, REQUESTS, CREDENTIALS, VEHICLES } from './seed.js'
+import { USERS, REQUESTS, CREDENTIALS, VEHICLES, CLIENTS } from './seed.js'
 import { findHandoverAt } from '../fines.js'
 import { filterDocuments } from '../documents.js'
-import { defaultPermConfig } from '../permissions.js'
+import { defaultPermConfig, mergeWithDefaults } from '../permissions.js'
 
 // Segnaposto dimostrativo per i documenti del cassetto (in demo è un data URL).
 const DEMO_DOC =
@@ -33,6 +33,7 @@ function load() {
     requests: REQUESTS,
     passwords: { ...CREDENTIALS },
     vehicles: VEHICLES,
+    clients: CLIENTS,
     handovers: [],
     issues: [],
     clockings: [],
@@ -316,7 +317,7 @@ export function subscribeToDocuments() {
 
 export async function getPermissionsConfig() {
   await delay(60)
-  return load().permConfig || defaultPermConfig()
+  return mergeWithDefaults(load().permConfig || null)
 }
 
 export async function savePermissionsConfig(config) {
@@ -333,6 +334,7 @@ export async function resetDemoData() {
     requests: REQUESTS,
     passwords: { ...CREDENTIALS },
     vehicles: VEHICLES,
+    clients: CLIENTS,
     handovers: [],
     issues: [],
     clockings: [],
@@ -629,7 +631,7 @@ export async function getClockingsInRange(fromISO, toISO) {
     .sort((a, b) => a.punchedAt.localeCompare(b.punchedAt))
 }
 
-export async function createClocking({ employeeId, kind, lat, lng, accuracy }) {
+export async function createClocking({ employeeId, kind, lat, lng, accuracy, clientId, clientName }) {
   await delay()
   const state = load()
   const nowIso = new Date().toISOString()
@@ -641,6 +643,8 @@ export async function createClocking({ employeeId, kind, lat, lng, accuracy }) {
     lat: lat ?? null,
     lng: lng ?? null,
     accuracy: accuracy ?? null,
+    clientId: clientId ?? null,
+    clientName: clientName ?? null,
     // Campi anti-frode: in demo tutto è locale e coerente (nessuna anomalia).
     deviceTime: nowIso,
     receivedAt: nowIso,
@@ -667,9 +671,48 @@ export async function exportAllData(adminId) {
     vehicles: state.vehicles || [],
     vehicle_handovers: state.handovers || [],
     vehicle_issues: state.issues || [],
+    clients: state.clients || [],
   }
 }
 
 export function subscribeToClockings() {
+  return () => {}
+}
+
+// --- Anagrafica clienti -----------------------------------------------------
+
+export async function listClients() {
+  await delay(120)
+  const state = load()
+  return (state.clients || []).slice().sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export async function upsertClient(client) {
+  await delay()
+  const state = load()
+  state.clients = state.clients || []
+  const next = {
+    id: client.id || `cli-${Date.now()}`,
+    name: client.name,
+    address: client.address ?? '',
+    lat: client.lat ?? null,
+    lng: client.lng ?? null,
+    active: client.active !== false,
+  }
+  const idx = state.clients.findIndex((c) => c.id === next.id)
+  if (idx >= 0) state.clients[idx] = next
+  else state.clients.push(next)
+  save(state)
+  return next
+}
+
+export async function deleteClient(clientId) {
+  await delay()
+  const state = load()
+  state.clients = (state.clients || []).filter((c) => c.id !== clientId)
+  save(state)
+}
+
+export function subscribeToClients() {
   return () => {}
 }

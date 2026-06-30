@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { defaultPermConfig, puo, categoryOf } from './permissions.js'
+import { defaultPermConfig, puo, categoryOf, mergeWithDefaults, PERMISSIONS } from './permissions.js'
 
 const cfg = defaultPermConfig()
 
@@ -48,6 +48,33 @@ test('utente non migrato (department non-categoria) ripiega sul ruolo', () => {
   const u = { id: 'x', role: 'manager', department: 'Produzione' }
   assert.equal(categoryOf(u, cfg), 'Responsabile')
   assert.equal(puo(u, 'straordinari.decide', cfg), true)
+})
+
+test('clienti.manage: di default per Amministratore/CEO/Responsabile/Commerciale, non Operativo', () => {
+  const amm = { id: 'a', role: 'admin', department: 'Amministratore' }
+  const resp = { id: 'm', role: 'manager', department: 'Responsabile' }
+  const comm = { id: 'c', role: 'employee', department: 'Commerciale' }
+  const op = { id: 'o', role: 'employee', department: 'Operativo' }
+  assert.equal(puo(amm, 'clienti.manage', cfg), true)
+  assert.equal(puo(resp, 'clienti.manage', cfg), true)
+  assert.equal(puo(comm, 'clienti.manage', cfg), true)
+  assert.equal(puo(op, 'clienti.manage', cfg), false)
+})
+
+test('mergeWithDefaults: riempie i flag mancanti senza alterare quelli espliciti', () => {
+  // Config "vecchia": Commerciale senza il flag clienti.manage, e con un flag
+  // esplicitamente disattivato che NON deve essere riacceso.
+  const old = {
+    categories: ['Commerciale'],
+    perms: { Commerciale: { 'area.timbrature': false } },
+  }
+  const merged = mergeWithDefaults(old)
+  // ogni permesso del catalogo è presente
+  for (const p of PERMISSIONS) assert.ok(p.key in merged.perms.Commerciale)
+  // il flag mancante prende il default della categoria (true per Commerciale)
+  assert.equal(merged.perms.Commerciale['clienti.manage'], true)
+  // il flag esplicitamente false resta false
+  assert.equal(merged.perms.Commerciale['area.timbrature'], false)
 })
 
 test('config assente: non blocca (anti-lockout)', () => {

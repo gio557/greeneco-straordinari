@@ -33,6 +33,7 @@ export const PERMISSIONS = [
   { group: 'Profili', key: 'profili.create', label: 'Creare/modificare profili' },
   { group: 'Profili', key: 'profili.delete', label: 'Eliminare profili' },
   { group: 'Profili', key: 'profili.category', label: "Cambiare la categoria di un utente" },
+  { group: 'Clienti', key: 'clienti.manage', label: "Gestire l'anagrafica clienti (inserire/modificare)" },
   { group: 'Visibilità dati', key: 'dati.tutti', label: 'Vedere i dati di tutti i reparti (non solo il proprio team)' },
   { group: 'Categorie & Permessi', key: 'area.permessi', label: 'Vedere Categorie & Permessi' },
   { group: 'Categorie & Permessi', key: 'permessi.edit', label: 'Modificare i flag / creare categorie' },
@@ -65,13 +66,35 @@ export function defaultPermConfig() {
         'area.straordinari', 'straordinari.create', 'straordinari.board', 'straordinari.decide',
         'area.automezzi', 'automezzi.handover', 'automezzi.board',
         'multe.view_own', 'multe.manage', 'multe.cancel',
+        'clienti.manage',
       ]),
       'Ufficio paghe': permsFrom([...EMPLOYEE_LIKE, 'cassetti.manage']),
       'Ufficio Tecnico': permsFrom(EMPLOYEE_LIKE),
       'Operativo': permsFrom(EMPLOYEE_LIKE),
-      'Commerciale': permsFrom(EMPLOYEE_LIKE),
+      'Commerciale': permsFrom([...EMPLOYEE_LIKE, 'clienti.manage']),
     },
   }
+}
+
+// Completa una configurazione salvata con i flag eventualmente mancanti (es.
+// permessi introdotti dopo il salvataggio): i flag assenti prendono il valore
+// di default della categoria (o false per le categorie personalizzate). I flag
+// impostati esplicitamente — anche a false — restano invariati. Così l'aggiunta
+// di un nuovo permesso non lo "spegne" silenziosamente per tutti.
+export function mergeWithDefaults(config) {
+  if (!config || !config.perms) return defaultPermConfig()
+  const def = defaultPermConfig()
+  const out = { categories: [...(config.categories || [])], perms: {} }
+  for (const cat of out.categories) {
+    const saved = config.perms[cat] || {}
+    const defaults = def.perms[cat] || {}
+    const merged = {}
+    for (const p of PERMISSIONS) {
+      merged[p.key] = (p.key in saved) ? saved[p.key] : (defaults[p.key] ?? false)
+    }
+    out.perms[cat] = merged
+  }
+  return out
 }
 
 // Categoria effettiva dell'utente: il suo "reparto" se è una categoria nota,

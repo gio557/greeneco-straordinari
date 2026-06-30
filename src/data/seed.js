@@ -69,6 +69,14 @@ export const CREDENTIALS = {
   'emp-3': 'demo123',
 }
 
+// Clienti demo per la sezione "Anagrafica clienti" e il riconoscimento in
+// timbratura. Le coordinate sono indicative (zona Torino).
+export const CLIENTS = [
+  { id: 'cli-1', name: 'Acme S.p.A.', address: 'Via Roma 1, Torino', lat: 45.0686, lng: 7.6826, active: true },
+  { id: 'cli-2', name: 'Beta Costruzioni S.r.l.', address: 'Corso Francia 100, Torino', lat: 45.0772, lng: 7.6440, active: true },
+  { id: 'cli-3', name: 'Gamma Logistica', address: 'Strada del Drosso 50, Torino', lat: 45.0192, lng: 7.6000, active: true },
+]
+
 // Mezzi demo per la sezione "Presa in carico automezzi".
 export const VEHICLES = [
   { id: 'veh-1', name: 'Fiat Ducato', plate: 'AB123CD', department: 'Logistica', active: true },

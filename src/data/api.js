@@ -86,6 +86,12 @@ export const subscribeToDocuments = impl.subscribeToDocuments
 export const getPermissionsConfig = impl.getPermissionsConfig
 export const savePermissionsConfig = impl.savePermissionsConfig
 
+// Anagrafica clienti
+export const listClients = impl.listClients
+export const upsertClient = impl.upsertClient
+export const deleteClient = impl.deleteClient
+export const subscribeToClients = impl.subscribeToClients
+
 // Timbrature presenze (con buffer di sicurezza in modalità Supabase)
 export const getLastClocking = clk.getLastClocking
 export const getMyClockings = clk.getMyClockings

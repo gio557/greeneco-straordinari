@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { supabase } from './supabaseClient.js'
-import { defaultPermConfig } from '../permissions.js'
+import { defaultPermConfig, mergeWithDefaults } from '../permissions.js'
 
 const REQUESTS_TABLE = 'overtime_requests'
 const PROFILES_TABLE = 'profiles'
@@ -633,6 +633,8 @@ function rowToClocking(c) {
     ipCountry: c.ip_country,
     ipDistanceKm: c.ip_distance_km,
     ipMismatch: c.ip_mismatch,
+    clientId: c.client_id ?? null,
+    clientName: c.client_name ?? null,
   }
 }
 
@@ -687,7 +689,7 @@ export async function getClockingsInRange(fromISO, toISO) {
 // (presenti solo dopo la migrazione dello schema). In entrambi i casi, per le
 // timbrature ONLINE non si invia `punched_at`: lo imposta il server (default
 // now() o trigger), così l'orologio del telefono non incide.
-function buildClockingRow({ employeeId, kind, lat, lng, accuracy, id, punchedAt, deviceTime, offline }, withFraud) {
+function buildClockingRow({ employeeId, kind, lat, lng, accuracy, id, punchedAt, deviceTime, offline, clientId, clientName }, withExtras) {
   const row = {
     id: id || `clk-${Date.now()}`,
     employee_id: employeeId,
@@ -696,9 +698,11 @@ function buildClockingRow({ employeeId, kind, lat, lng, accuracy, id, punchedAt,
     lng: lng ?? null,
     accuracy: accuracy ?? null,
   }
-  if (withFraud) {
+  if (withExtras) {
     row.device_time = deviceTime ?? punchedAt ?? null
     row.offline = !!offline
+    row.client_id = clientId ?? null
+    row.client_name = clientName ?? null
   }
   if (offline && (punchedAt || deviceTime)) row.punched_at = punchedAt ?? deviceTime
   return row
@@ -712,6 +716,8 @@ function isMissingFraudColumns(message) {
     m.includes('device_time') ||
     m.includes('received_at') ||
     m.includes('clock_skew') ||
+    m.includes('client_id') ||
+    m.includes('client_name') ||
     (m.includes('offline') && m.includes('column')) ||
     m.includes('schema cache')
   )
@@ -741,6 +747,56 @@ export function subscribeToClockings(onChange) {
   const channel = supabase
     .channel('time_clockings_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'time_clockings' }, onChange)
+    .subscribe()
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+// ===========================================================================
+// ANAGRAFICA CLIENTI
+// ===========================================================================
+
+function rowToClient(c) {
+  return { id: c.id, name: c.name, address: c.address ?? '', lat: c.lat ?? null, lng: c.lng ?? null, active: c.active !== false }
+}
+
+export async function listClients() {
+  const { data, error } = await supabase
+    .from('clients')
+    .select('*')
+    .order('name', { ascending: true })
+  if (error) throw new Error(error.message)
+  return data.map(rowToClient)
+}
+
+export async function upsertClient(client) {
+  const row = {
+    id: client.id || `cli-${Date.now()}`,
+    name: client.name,
+    address: client.address ?? null,
+    lat: client.lat ?? null,
+    lng: client.lng ?? null,
+    active: client.active !== false,
+  }
+  const { data, error } = await supabase
+    .from('clients')
+    .upsert(row, { onConflict: 'id' })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return rowToClient(data)
+}
+
+export async function deleteClient(clientId) {
+  const { error } = await supabase.from('clients').delete().eq('id', clientId)
+  if (error) throw new Error(error.message)
+}
+
+export function subscribeToClients(onChange) {
+  const channel = supabase
+    .channel('clients_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, onChange)
     .subscribe()
   return () => {
     supabase.removeChannel(channel)
@@ -848,7 +904,7 @@ export async function getPermissionsConfig() {
   const { data, error } = await supabase
     .from('app_config').select('value').eq('key', 'permissions').maybeSingle()
   if (error) throw new Error(error.message)
-  return data?.value || defaultPermConfig()
+  return mergeWithDefaults(data?.value || null)
 }
 
 export async function savePermissionsConfig(config) {
@@ -872,6 +928,7 @@ const EXPORT_TABLES = [
   'vehicles',
   'vehicle_handovers',
   'vehicle_issues',
+  'clients',
 ]
 
 export async function exportAllData(adminId) {

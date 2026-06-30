@@ -768,3 +768,42 @@ begin
     alter publication supabase_realtime add table public.time_clockings;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- ANAGRAFICA CLIENTI
+-- ---------------------------------------------------------------------------
+-- Elenco dei clienti presso cui si svolge il lavoro. `lat`/`lng` (geocodificate
+-- da OpenStreetMap al momento dell'inserimento) permettono, in timbratura, di
+-- riconoscere il cliente dalla posizione del dipendente.
+create table if not exists public.clients (
+  id          text primary key,
+  name        text not null,          -- ragione sociale
+  address     text,
+  lat         double precision,
+  lng         double precision,
+  active      boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.clients enable row level security;
+drop policy if exists "clients_select_anon" on public.clients;
+create policy "clients_select_anon" on public.clients for select to anon, authenticated using (true);
+drop policy if exists "clients_insert_anon" on public.clients;
+create policy "clients_insert_anon" on public.clients for insert to anon, authenticated with check (true);
+drop policy if exists "clients_update_anon" on public.clients;
+create policy "clients_update_anon" on public.clients for update to anon, authenticated using (true) with check (true);
+drop policy if exists "clients_delete_anon" on public.clients;
+create policy "clients_delete_anon" on public.clients for delete to anon, authenticated using (true);
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='clients') then
+    alter publication supabase_realtime add table public.clients;
+  end if;
+end $$;
+
+-- Cliente associato alla timbratura (in genere all'«inizio lavoro»):
+--   client_id   = riferimento all'anagrafica (se riconosciuto/scelto)
+--   client_name = testo libero (cliente nuovo non ancora in anagrafica)
+alter table public.time_clockings add column if not exists client_id   text references public.clients (id) on delete set null;
+alter table public.time_clockings add column if not exists client_name text;
