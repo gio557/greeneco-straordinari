@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   getUserMap, getEmployeeDocuments, createEmployeeDocument, deleteEmployeeDocument,
-  uploadDocFile, getDocFileUrl, subscribeToDocuments,
+  uploadDocFile, getDocFileUrl, subscribeToDocuments, listVehicles,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { DOC_KINDS } from '../documents.js'
 import { initials } from '../utils.js'
 import FineAttachment from './FineAttachment.jsx'
+import FineForm from './FineForm.jsx'
 
 function fmtDate(d) {
   if (!d) return ''
@@ -67,6 +68,11 @@ function EmployeeDrawer({ user, employeeId, name, onBack }) {
   const [docs, setDocs] = useState([])
   const [urls, setUrls] = useState({})
   const [loading, setLoading] = useState(true)
+  const [vehicles, setVehicles] = useState([])
+  const [showFine, setShowFine] = useState(false)
+  const [fineSaved, setFineSaved] = useState(false)
+
+  useEffect(() => { listVehicles().then(setVehicles).catch(() => {}) }, [])
 
   async function refresh(showSpinner = false) {
     if (showSpinner) setLoading(true)
@@ -130,6 +136,29 @@ function EmployeeDrawer({ user, employeeId, name, onBack }) {
           </section>
         )
       })}
+
+      <section className="drawer-section">
+        <h3 className="mini-title">Multe</h3>
+        {fineSaved && (
+          <p className="muted small">
+            ✓ Multa registrata: è visibile a {name} nel suo Cassetto → Multe e nella scheda Automezzi → Sanzioni.
+          </p>
+        )}
+        <button className="btn-primary btn-sm" onClick={() => { setFineSaved(false); setShowFine(true) }}>+ Registra multa</button>
+        <p className="muted small">La multa sarà attribuita a <strong>{name}</strong> e gestita come tutte le altre (stessa notifica e presa visione).</p>
+      </section>
+
+      {showFine && (
+        <FineForm
+          vehicles={vehicles}
+          employees={[{ id: employeeId, name }]}
+          userMap={{ [employeeId]: { name } }}
+          user={user}
+          lockedEmployeeId={employeeId}
+          onClose={() => setShowFine(false)}
+          onSaved={() => { setShowFine(false); setFineSaved(true) }}
+        />
+      )}
     </main>
   )
 }
