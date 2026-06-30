@@ -1869,3 +1869,68 @@ code {
 .vbars-month { height: 150px; gap: 10px; }
 .vbars-month .vbar { max-width: 46px; width: 60%; }
 .vbar-num { font-size: 11px; font-weight: 700; color: var(--navy); font-variant-numeric: tabular-nums; }
+
+/* =========================================================================
+   ESPERIENZA DESKTOP / SCHERMI AMPI
+   Il layout è mobile-first; queste regole si attivano SOLO su schermi larghi
+   (il browser comunica la risoluzione del client) e distribuiscono i contenuti
+   su tutta la larghezza disponibile, trasformando l'app in un cruscotto.
+   ========================================================================= */
+@media (min-width: 880px) {
+  /* Schermate "a colonna" (form): più respiro ma ancora leggibili. */
+  .app { max-width: 760px; }
+  /* Schermate "larghe" (tabelloni, grafici, gestione): molta più area utile. */
+  .app-wide { max-width: 1140px; }
+  .content { padding: 26px 30px 96px; }
+
+  /* --- Hub come cruscotto: griglia di card su sfondo, non più colonna stretta --- */
+  .hub {
+    max-width: 1160px;
+    background: transparent;
+    padding: calc(var(--sat) + 28px) calc(28px + var(--sar)) 56px calc(28px + var(--sal));
+  }
+  .login-brand { text-align: center; margin-bottom: 22px; }
+  .login-brand h1 { font-size: 30px; }
+  .hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+  }
+  .admin-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    align-items: stretch;
+  }
+  .admin-section .admin-label { grid-column: 1 / -1; margin-bottom: 0; }
+
+  /* Card area: tile con effetto "sollevamento" al passaggio del mouse. */
+  .area-card {
+    min-height: 96px;
+    transition: transform 0.13s ease, box-shadow 0.13s ease, border-color 0.13s ease;
+  }
+  .area-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(13, 59, 102, 0.16);
+    border-color: var(--accent, var(--navy));
+  }
+  .hub-userbar, .hub-fine-banner { max-width: none; }
+
+  /* I grafici hanno più colonne e più aria. */
+  .charts-grid { gap: 18px; }
+  .vbars { height: 190px; }
+}
+
+@media (min-width: 1280px) {
+  .app-wide { max-width: 1340px; }
+  .hub { max-width: 1300px; }
+  .content { padding: 28px 36px 96px; }
+  .login-brand h1 { font-size: 34px; }
+  /* Tabelle e tabelloni respirano su monitor grandi. */
+  .dash-table th, .dash-table td { padding: 11px 14px; }
+}
+
+@media (min-width: 1700px) {
+  .app-wide { max-width: 1560px; }
+  .hub { max-width: 1500px; }
+}
