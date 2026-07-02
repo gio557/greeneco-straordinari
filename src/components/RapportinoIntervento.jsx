@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react'
 import {
-  saveRapportino, getRapportini, getAllRapportini, deleteRapportino, subscribeToRapportini,
+  saveRapportino, getAllRapportini, deleteRapportino, subscribeToRapportini,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { puo } from '../permissions.js'
@@ -466,21 +466,23 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
 
 // ---------------------------------------------------------------------------
 // ARCHIVIO: elenco dei rapportini + apertura in consultazione o nuovo modulo.
-// Visibilità: ognuno vede i propri; chi ha "dati.tutti" vede quelli di tutti.
+// Visibilità: TUTTI i rapportini sono accessibili a chiunque entri nell'area,
+// a prescindere dalla categoria. L'eliminazione resta però riservata all'autore
+// e a chi ha la visibilità estesa (dati.tutti), per evitare cancellazioni
+// accidentali del lavoro altrui.
 // ---------------------------------------------------------------------------
 export default function RapportinoIntervento({ user, permConfig = null }) {
-  const seeAll = puo(user, 'dati.tutti', permConfig)
+  const canDeleteAny = puo(user, 'dati.tutti', permConfig)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState({ mode: 'list' }) // 'list' | 'new' | { mode:'view', record }
 
   async function refresh(showSpinner = false) {
     if (showSpinner) setLoading(true)
-    const list = seeAll ? await getAllRapportini() : await getRapportini(user.id)
-    setItems(list)
+    setItems(await getAllRapportini())
     setLoading(false)
   }
-  useLiveData(refresh, [user.id, seeAll], subscribeToRapportini)
+  useLiveData(refresh, [user.id], subscribeToRapportini)
 
   async function remove(rec) {
     if (!window.confirm('Eliminare questo rapportino dall\'archivio?')) return
@@ -516,9 +518,7 @@ export default function RapportinoIntervento({ user, permConfig = null }) {
         <button className="btn-primary btn-sm" onClick={() => setView({ mode: 'new' })}>+ Nuovo rapportino</button>
       </div>
       <p className="muted small">
-        {seeAll
-          ? 'Archivio di tutti i rapportini. Tocca una voce per consultarla o esportarla in PDF.'
-          : 'I tuoi rapportini archiviati. Tocca una voce per consultarla o esportarla in PDF.'}
+        Archivio di tutti i rapportini. Tocca una voce per consultarla o esportarla in PDF.
       </p>
 
       {loading ? (
@@ -534,12 +534,12 @@ export default function RapportinoIntervento({ user, permConfig = null }) {
                   <span className="request-employee">{rapportinoLabel(r)}</span>
                   {r.clientName && <span className="muted small">{r.clientName}</span>}
                   <span className="muted small">
-                    {r.docDate || '—'}{seeAll && r.authorName ? ` · ${r.authorName}` : ''}
+                    {r.docDate || '—'}{r.authorName ? ` · ${r.authorName}` : ''}
                   </span>
                 </span>
                 <span className="area-arrow" aria-hidden>›</span>
               </button>
-              {(seeAll || r.authorId === user.id) && (
+              {(canDeleteAny || r.authorId === user.id) && (
                 <div className="decision-actions">
                   <button className="btn-ghost btn-sm danger" onClick={() => remove(r)}>Elimina</button>
                 </div>
