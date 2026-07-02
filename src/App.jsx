@@ -17,6 +17,7 @@ import PagheCassetti from './components/PagheCassetti.jsx'
 import PermessiPage from './components/PermessiPage.jsx'
 import ClientsAdmin from './components/ClientsAdmin.jsx'
 import FineNoticeModal from './components/FineNoticeModal.jsx'
+import RapportinoIntervento from './components/RapportinoIntervento.jsx'
 import ComingSoon from './components/ComingSoon.jsx'
 
 const SESSION_KEY = 'straordinari_session'
@@ -236,6 +237,15 @@ export default function App() {
         {seeTimbratureBoard
           ? <TimbratureBoard user={user} permConfig={permConfig} />
           : <Timbrature user={user} permConfig={permConfig} />}
+      </div>
+    )
+  }
+
+  if (area === 'rapportini') {
+    return (
+      <div className="app app-wide">
+        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
+        <RapportinoIntervento user={user} />
       </div>
     )
   }

@@ -105,7 +105,7 @@ export const AREAS = [
     subtitle: 'Compila e consulta i rapportini di intervento',
     accent: '#2e9e5b',
     Icon: ReportIcon,
-    ready: false,
+    ready: true,
   },
   {
     id: 'magazzino',
