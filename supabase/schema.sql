@@ -807,3 +807,41 @@ end $$;
 --   client_name = testo libero (cliente nuovo non ancora in anagrafica)
 alter table public.time_clockings add column if not exists client_id   text references public.clients (id) on delete set null;
 alter table public.time_clockings add column if not exists client_name text;
+
+-- ===========================================================================
+-- RAPPORTINI D'INTERVENTO (archivio)
+-- Modulo d'intervento compilato dall'operatore e archiviato (oltre all'export
+-- PDF). I dati completi del modulo (campi + firme) sono salvati come JSON in
+-- `data`, così il rapportino è auto-contenuto e ricomponibile in consultazione.
+-- I campi sintetici (intervention_id, client_name, doc_date) servono per
+-- l'elenco e la ricerca. `author_id` è chi lo ha compilato/archiviato.
+-- ===========================================================================
+create table if not exists public.rapportini (
+  id              text primary key,
+  author_id       text references public.profiles (id) on delete set null,
+  author_name     text,
+  intervention_id text,
+  client_name     text,
+  doc_date        text,
+  data            jsonb not null default '{}'::jsonb,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+create index if not exists rapportini_author_idx on public.rapportini (author_id);
+
+alter table public.rapportini enable row level security;
+drop policy if exists "rapportini_select_anon" on public.rapportini;
+create policy "rapportini_select_anon" on public.rapportini for select to anon, authenticated using (true);
+drop policy if exists "rapportini_insert_anon" on public.rapportini;
+create policy "rapportini_insert_anon" on public.rapportini for insert to anon, authenticated with check (true);
+drop policy if exists "rapportini_update_anon" on public.rapportini;
+create policy "rapportini_update_anon" on public.rapportini for update to anon, authenticated using (true) with check (true);
+drop policy if exists "rapportini_delete_anon" on public.rapportini;
+create policy "rapportini_delete_anon" on public.rapportini for delete to anon, authenticated using (true);
+
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='rapportini') then
+    alter publication supabase_realtime add table public.rapportini;
+  end if;
+end $$;

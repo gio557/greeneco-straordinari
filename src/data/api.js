@@ -82,6 +82,13 @@ export const acknowledgeDocument = impl.acknowledgeDocument
 export const deleteEmployeeDocument = impl.deleteEmployeeDocument
 export const subscribeToDocuments = impl.subscribeToDocuments
 
+// Rapportini d'intervento (archivio)
+export const saveRapportino = impl.saveRapportino
+export const getRapportini = impl.getRapportini
+export const getAllRapportini = impl.getAllRapportini
+export const deleteRapportino = impl.deleteRapportino
+export const subscribeToRapportini = impl.subscribeToRapportini
+
 // Categorie & Permessi
 export const getPermissionsConfig = impl.getPermissionsConfig
 export const savePermissionsConfig = impl.savePermissionsConfig

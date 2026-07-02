@@ -63,6 +63,31 @@ function load() {
       { id: 'doc-demo-1', employeeId: 'emp-1', kind: 'cedolino', title: 'Cedolino maggio 2026', docDate: '2026-05-31', attachmentPath: DEMO_DOC, needsAck: false, acknowledgedAt: null, uploadedBy: 'paghe-1', createdAt: '2026-06-02T09:00:00+02:00' },
       { id: 'doc-demo-2', employeeId: 'emp-1', kind: 'disciplinare', title: 'Richiamo verbale', docDate: '2026-04-10', attachmentPath: DEMO_DOC, needsAck: true, acknowledgedAt: null, uploadedBy: 'paghe-1', createdAt: '2026-04-11T09:00:00+02:00' },
     ],
+    // Rapportino d'intervento dimostrativo (archivio) per emp-1.
+    rapportini: [
+      {
+        id: 'rap-demo-1',
+        authorId: 'emp-1',
+        authorName: 'Giulia Rossi',
+        interventionId: 'MAN-2026-014',
+        clientName: 'Acme S.p.A. — Via Roma 1, Torino',
+        docDate: '12-06-2026',
+        data: {
+          fields: {
+            id: 'MAN-2026-014',
+            data_compilazione: '12-06-2026',
+            richiesto_da: 'Ufficio tecnico Acme',
+            cliente_luogo: 'Acme S.p.A. — Via Roma 1, Torino',
+            descrizione: 'Sostituzione pompa di rilancio e verifica del quadro elettrico.',
+            esito: 'Intervento concluso, impianto ripristinato e collaudato.',
+            autore: 'Giulia Rossi',
+          },
+          signatures: { resp: null, ref: null },
+        },
+        createdAt: '2026-06-12T16:30:00+02:00',
+        updatedAt: '2026-06-12T16:30:00+02:00',
+      },
+    ],
   }
   save(initial)
   return initial
@@ -310,6 +335,56 @@ export async function deleteEmployeeDocument(docId) {
 }
 
 export function subscribeToDocuments() {
+  return () => {}
+}
+
+// --- Rapportini d'intervento (archivio) ------------------------------------
+
+// Salva (nuovo) o aggiorna (se `rec.id` esiste già) un rapportino nell'archivio.
+export async function saveRapportino(rec) {
+  await delay()
+  const state = load()
+  state.rapportini = state.rapportini || []
+  const now = new Date().toISOString()
+  const id = rec.id || `rap-${Date.now()}`
+  const idx = state.rapportini.findIndex((r) => r.id === id)
+  const next = {
+    id,
+    authorId: rec.authorId ?? null,
+    authorName: rec.authorName ?? '',
+    interventionId: rec.interventionId ?? '',
+    clientName: rec.clientName ?? '',
+    docDate: rec.docDate ?? '',
+    data: rec.data ?? {},
+    createdAt: idx >= 0 ? state.rapportini[idx].createdAt : now,
+    updatedAt: now,
+  }
+  if (idx >= 0) state.rapportini[idx] = next
+  else state.rapportini.push(next)
+  save(state)
+  return next
+}
+
+// Elenco dei rapportini: se `authorId` è passato, solo quelli di quell'autore
+// (archivio personale); altrimenti tutti (per chi ha la visibilità estesa).
+export async function getRapportini(authorId = null) {
+  await delay(80)
+  const list = (load().rapportini || []).filter((r) => !authorId || r.authorId === authorId)
+  return list.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+}
+
+export async function getAllRapportini() {
+  return getRapportini(null)
+}
+
+export async function deleteRapportino(id) {
+  await delay()
+  const state = load()
+  state.rapportini = (state.rapportini || []).filter((r) => r.id !== id)
+  save(state)
+}
+
+export function subscribeToRapportini() {
   return () => {}
 }
 
@@ -672,6 +747,7 @@ export async function exportAllData(adminId) {
     vehicle_handovers: state.handovers || [],
     vehicle_issues: state.issues || [],
     clients: state.clients || [],
+    rapportini: state.rapportini || [],
   }
 }
 
