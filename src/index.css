@@ -1958,6 +1958,23 @@ code {
 }
 .rap-item-main { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 
+/* Archivio rapportini raggruppato per cliente (annidato). */
+.rap-cligroup { display: block; }
+.rap-cligroup .ts-caret { margin-right: 8px; color: #6b7280; }
+.rap-subitems { margin: 8px 0 2px; padding-left: 14px; border-left: 3px solid #e4e9f0; display: flex; flex-direction: column; gap: 8px; }
+.rap-cli-rows { display: flex; flex-direction: column; gap: 8px; }
+
+/* Anagrafica clienti: rapportini del cliente (riga espansa). */
+.cli-raps-row > td { background: #f7f9fb; }
+.cli-raps { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+.cli-rap-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: #fff; border: 1px solid #e4e9f0; border-radius: 8px; padding: 8px 10px; cursor: pointer;
+}
+.cli-rap-item:hover { background: #eef3f8; }
+.cli-rap-item .request-employee { font-weight: 600; }
+.cli-rap-item .area-arrow { margin-left: auto; color: #9aa4b2; }
+
 /* Campo Cliente con selezione dall'anagrafica (menu a comparsa). */
 .rap-client { position: relative; }
 .rap-client-menu {

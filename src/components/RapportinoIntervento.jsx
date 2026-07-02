@@ -5,7 +5,7 @@ import {
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { puo } from '../permissions.js'
-import { buildRapportinoRecord, rapportinoLabel } from '../rapportini.js'
+import { buildRapportinoRecord, rapportinoLabel, groupByClient } from '../rapportini.js'
 
 // ---------------------------------------------------------------------------
 // Rapportino d'intervento GreenEco — riproduzione fedele del modulo cartaceo,
@@ -232,7 +232,7 @@ function ClientField({ name, style, placeholder, onChange }) {
     if (taRef.current) taRef.current.value = text
     setOpen(false)
     setAdding(false)
-    onChange?.()
+    onChange?.(c) // notifica il cliente selezionato (per il legame all'anagrafica)
   }
 
   async function addNew(e) {
@@ -323,7 +323,7 @@ function TimeRow({ row }) {
 // MODULO compilabile (nuovo o in consultazione). Uncontrolled: i valori si
 // leggono/scrivono dal DOM tramite `name`, così il modulo resta leggero.
 // ---------------------------------------------------------------------------
-function RapportinoForm({ user, initial = null, existingId = null, initialStatus = null, onBack, onArchived, registerNavGuard }) {
+function RapportinoForm({ user, initial = null, existingId = null, initialStatus = null, initialClient = null, onBack, onArchived, registerNavGuard }) {
   const sheetRef = useRef(null)
   const sigRespRef = useRef(null)
   const sigRefRef = useRef(null)
@@ -333,6 +333,7 @@ function RapportinoForm({ user, initial = null, existingId = null, initialStatus
   const [archiveMsg, setArchiveMsg] = useState('')
   const [recId, setRecId] = useState(existingId)
   const [status, setStatus] = useState(initialStatus)  // 'archived' | 'draft' | null (nuovo)
+  const [clientSel, setClientSel] = useState(initialClient?.id ? { id: initialClient.id, name: initialClient.name } : null) // cliente scelto dall'anagrafica
   const [dirty, setDirty] = useState(false)            // modifiche non salvate
   const [tick, setTick] = useState(0)                  // ogni modifica: riarma l'autosave
   const [autoMsg, setAutoMsg] = useState('')           // indicatore salvataggio automatico
@@ -375,7 +376,7 @@ function RapportinoForm({ user, initial = null, existingId = null, initialStatus
 
   // Persistenza vera e propria (usata sia dal salvataggio manuale sia dall'autosave).
   async function persist(nextStatus) {
-    const record = buildRapportinoRecord({ fields: collectFields(), signatures: signatures(), user, existing: recId ? { id: recId } : null, status: nextStatus })
+    const record = buildRapportinoRecord({ fields: collectFields(), signatures: signatures(), user, existing: recId ? { id: recId } : null, status: nextStatus, client: clientSel })
     const saved = await saveRapportino(record)
     setRecId(saved.id)
     setStatus(nextStatus)
@@ -607,13 +608,13 @@ function RapportinoForm({ user, initial = null, existingId = null, initialStatus
                   </td>
                   <td style={{ width: '34%' }} rowSpan={2}>
                     <div className="rap-lbl">Cliente (Indirizzo e Fatturazione)</div>
-                    <ClientField name="cliente_fatturazione" style={{ height: '120px' }} onChange={() => markDirty()} />
+                    <ClientField name="cliente_fatturazione" style={{ height: '120px' }} onChange={(c) => { markDirty(); if (c?.id) setClientSel({ id: c.id, name: c.name }) }} />
                   </td>
                 </tr>
                 <tr>
                   <td colSpan={2}>
                     <div className="rap-lbl">Cliente (Luogo della prestazione)</div>
-                    <ClientField name="cliente_luogo" style={{ height: '88px', fontSize: '15px' }} onChange={() => markDirty()} />
+                    <ClientField name="cliente_luogo" style={{ height: '88px', fontSize: '15px' }} onChange={(c) => { markDirty(); if (c?.id) setClientSel({ id: c.id, name: c.name }) }} />
                   </td>
                 </tr>
               </tbody>
@@ -748,11 +749,12 @@ function RapportinoForm({ user, initial = null, existingId = null, initialStatus
 // e a chi ha la visibilità estesa (dati.tutti), per evitare cancellazioni
 // accidentali del lavoro altrui.
 // ---------------------------------------------------------------------------
-export default function RapportinoIntervento({ user, permConfig = null, registerNavGuard }) {
+export default function RapportinoIntervento({ user, permConfig = null, registerNavGuard, openRecord = null, onConsumedOpen }) {
   const canDeleteAny = puo(user, 'dati.tutti', permConfig)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState({ mode: 'list' }) // 'list' | 'new' | { mode:'view', record }
+  const [openClient, setOpenClient] = useState(null)  // cliente espanso nell'archivio
 
   async function refresh(showSpinner = false) {
     if (showSpinner) setLoading(true)
@@ -760,6 +762,15 @@ export default function RapportinoIntervento({ user, permConfig = null, register
     setLoading(false)
   }
   useLiveData(refresh, [user.id], subscribeToRapportini)
+
+  // Apertura "profonda" da un'altra area (es. Anagrafica clienti → un rapportino).
+  useEffect(() => {
+    if (openRecord) {
+      setView({ mode: 'view', record: openRecord })
+      onConsumedOpen?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRecord])
 
   async function remove(rec) {
     const what = rec.status === 'draft' ? 'questa bozza' : 'questo rapportino dall\'archivio'
@@ -786,15 +797,18 @@ export default function RapportinoIntervento({ user, permConfig = null, register
         initial={view.record?.data || null}
         existingId={view.record?.id || null}
         initialStatus={view.record?.status || null}
+        initialClient={{ id: view.record?.clientId, name: view.record?.clientName }}
         onBack={() => { setView({ mode: 'list' }); refresh() }}
         onArchived={() => refresh()}
       />
     )
   }
 
-  // Bozze: solo le proprie (WIP privato). Archivio: tutti i rapportini archiviati.
+  // Bozze: solo le proprie (WIP privato). Archivio: tutti gli archiviati,
+  // raggruppati per cliente (struttura annidata come le timbrature).
   const drafts = items.filter((r) => r.status === 'draft' && r.authorId === user.id)
   const archived = items.filter((r) => r.status !== 'draft')
+  const groups = groupByClient(archived)
 
   const renderItem = (r) => (
     <div key={r.id} className="card fine-card">
@@ -803,7 +817,6 @@ export default function RapportinoIntervento({ user, permConfig = null, register
           <span className="request-employee">
             {rapportinoLabel(r)}{r.status === 'draft' ? ' · bozza' : ''}
           </span>
-          {r.clientName && <span className="muted small">{r.clientName}</span>}
           <span className="muted small">{r.docDate || '—'}{r.authorName ? ` · ${r.authorName}` : ''}</span>
         </span>
         <span className="area-arrow" aria-hidden>›</span>
@@ -835,11 +848,35 @@ export default function RapportinoIntervento({ user, permConfig = null, register
             </section>
           )}
           <section>
-            <h3 className="mini-title">Archivio</h3>
-            <p className="muted small">Tutti i rapportini archiviati. Tocca una voce per consultarla o esportarla in PDF.</p>
-            {archived.length === 0
-              ? <p className="muted small">Nessun rapportino archiviato. Premi “+ Nuovo rapportino” per compilarne uno.</p>
-              : <div className="list">{archived.map(renderItem)}</div>}
+            <h3 className="mini-title">Archivio per cliente</h3>
+            {groups.length === 0 ? (
+              <p className="muted small">Nessun rapportino archiviato. Premi “+ Nuovo rapportino” per compilarne uno.</p>
+            ) : (
+              <>
+                <p className="muted small">Tocca un cliente per vedere i suoi rapportini.</p>
+                <div className="list">
+                  {groups.map((g) => {
+                    const open = openClient === g.key
+                    return (
+                      <div key={g.key || '(nessuno)'} className="card rap-cligroup">
+                        <button className="rap-item" onClick={() => setOpenClient(open ? null : g.key)}>
+                          <span className="ts-caret" aria-hidden>{open ? '▾' : '▸'}</span>
+                          <span className="rap-item-main">
+                            <span className="request-employee">{g.label}</span>
+                            <span className="muted small">{g.items.length} rapportin{g.items.length === 1 ? 'o' : 'i'}</span>
+                          </span>
+                        </button>
+                        {open && (
+                          <div className="rap-subitems">
+                            {g.items.map(renderItem)}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </section>
         </>
       )}

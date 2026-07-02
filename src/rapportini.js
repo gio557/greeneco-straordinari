@@ -28,18 +28,42 @@ export function summarizeRapportino(fields = {}) {
 // presente) porta l'id del rapportino già archiviato → aggiornamento anziché
 // nuovo inserimento. I dati completi (campi + firme) restano in `data`, così il
 // rapportino è auto-contenuto e ricomponibile in consultazione/PDF.
-export function buildRapportinoRecord({ fields = {}, signatures = {}, user = null, existing = null, status = 'archived' } = {}) {
+export function buildRapportinoRecord({ fields = {}, signatures = {}, user = null, existing = null, status = 'archived', client = null } = {}) {
   const s = summarizeRapportino(fields)
   return {
     id: existing?.id,
     authorId: user?.id ?? null,
     authorName: user?.name ?? '',
     interventionId: s.interventionId,
-    clientName: s.clientName,
+    // Legame all'anagrafica se un cliente è stato selezionato; altrimenti solo
+    // il nome ricavato dal testo (clientId null).
+    clientId: client?.id ?? null,
+    clientName: client?.name ?? s.clientName,
     docDate: s.docDate,
     status,
     data: { fields, signatures },
   }
+}
+
+// Raggruppa i rapportini per cliente (per l'archivio "per cliente" e per
+// l'anagrafica). Chiave: clientId se presente, altrimenti il nome normalizzato;
+// i rapportini senza cliente finiscono nel gruppo speciale con key ''.
+export function groupByClient(list = []) {
+  const map = new Map()
+  for (const r of list) {
+    const key = r.clientId || (r.clientName || '').trim().toLowerCase()
+    const label = (r.clientName || '').trim() || 'Senza cliente'
+    if (!map.has(key)) map.set(key, { key, clientId: r.clientId || null, label, items: [] })
+    map.get(key).items.push(r)
+  }
+  const groups = [...map.values()]
+  // "Senza cliente" (key vuota) in fondo; gli altri per nome.
+  groups.sort((a, b) => {
+    if (a.key === '' && b.key !== '') return 1
+    if (b.key === '' && a.key !== '') return -1
+    return a.label.localeCompare(b.label)
+  })
+  return groups
 }
 
 // Etichetta breve per una voce dell'elenco (quando l'ID intervento manca).

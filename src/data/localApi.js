@@ -354,6 +354,7 @@ export async function saveRapportino(rec) {
     authorId: rec.authorId ?? null,
     authorName: rec.authorName ?? '',
     interventionId: rec.interventionId ?? '',
+    clientId: rec.clientId ?? null,
     clientName: rec.clientName ?? '',
     docDate: rec.docDate ?? '',
     status: rec.status || 'archived',

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { summarizeRapportino, buildRapportinoRecord, rapportinoLabel } from './rapportini.js'
+import { summarizeRapportino, buildRapportinoRecord, rapportinoLabel, groupByClient } from './rapportini.js'
 
 test('summarizeRapportino: estrae ID, data e cliente (prima riga del luogo)', () => {
   const s = summarizeRapportino({
@@ -45,6 +45,30 @@ test('buildRapportinoRecord: nuovo record (senza id) porta autore e dati complet
 test('buildRapportinoRecord: status esplicito (bozza) viene mantenuto', () => {
   const rec = buildRapportinoRecord({ fields: { id: 'B-1' }, user: { id: 'e', name: 'E' }, status: 'draft' })
   assert.equal(rec.status, 'draft')
+})
+
+test('buildRapportinoRecord: cliente selezionato → clientId e clientName dall\'anagrafica', () => {
+  const rec = buildRapportinoRecord({
+    fields: { id: 'A-9', cliente_luogo: 'testo diverso' },
+    user: { id: 'e', name: 'E' },
+    client: { id: 'cli-7', name: 'Acme S.p.A.' },
+  })
+  assert.equal(rec.clientId, 'cli-7')
+  assert.equal(rec.clientName, 'Acme S.p.A.') // vince l'anagrafica sul testo
+})
+
+test('groupByClient: raggruppa per clientId, "Senza cliente" in fondo', () => {
+  const groups = groupByClient([
+    { id: 'r1', clientId: 'c1', clientName: 'Beta' },
+    { id: 'r2', clientId: 'c1', clientName: 'Beta' },
+    { id: 'r3', clientId: null, clientName: '' },
+    { id: 'r4', clientId: 'c2', clientName: 'Acme' },
+  ])
+  assert.equal(groups.length, 3)
+  assert.equal(groups[0].label, 'Acme')            // ordine alfabetico
+  assert.equal(groups[1].label, 'Beta')
+  assert.equal(groups[1].items.length, 2)          // due rapportini per Beta
+  assert.equal(groups[2].label, 'Senza cliente')   // in fondo
 })
 
 test('buildRapportinoRecord: con existing → aggiornamento (mantiene id)', () => {
