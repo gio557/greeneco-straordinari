@@ -323,7 +323,7 @@ function TimeRow({ row }) {
 // MODULO compilabile (nuovo o in consultazione). Uncontrolled: i valori si
 // leggono/scrivono dal DOM tramite `name`, così il modulo resta leggero.
 // ---------------------------------------------------------------------------
-function RapportinoForm({ user, initial = null, existingId = null, onBack, onArchived, registerNavGuard }) {
+function RapportinoForm({ user, initial = null, existingId = null, initialStatus = null, onBack, onArchived, registerNavGuard }) {
   const sheetRef = useRef(null)
   const sigRespRef = useRef(null)
   const sigRefRef = useRef(null)
@@ -332,8 +332,14 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
   const [archiving, setArchiving] = useState(false)
   const [archiveMsg, setArchiveMsg] = useState('')
   const [recId, setRecId] = useState(existingId)
-  const [dirty, setDirty] = useState(false)         // modifiche non salvate
+  const [status, setStatus] = useState(initialStatus)  // 'archived' | 'draft' | null (nuovo)
+  const [dirty, setDirty] = useState(false)            // modifiche non salvate
+  const [tick, setTick] = useState(0)                  // ogni modifica: riarma l'autosave
+  const [autoMsg, setAutoMsg] = useState('')           // indicatore salvataggio automatico
   const [leavePrompt, setLeavePrompt] = useState(null) // { proceed } quando si sta uscendo
+
+  // Segnala una modifica: marca "sporco" e riarma il debounce dell'autosave.
+  function markDirty() { setDirty(true); setTick((t) => t + 1) }
 
   // Consultazione: ripopola i campi (uncontrolled) dal record archiviato.
   useEffect(() => {
@@ -352,24 +358,42 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
     return fields
   }
 
-  // Salvataggio: status 'archived' (archivio, visibile a tutti) o 'draft' (bozza).
-  async function salva(status) {
+  function signatures() {
+    return {
+      resp: sigRespRef.current?.toDataURL?.() || null,
+      ref: sigRefRef.current?.toDataURL?.() || null,
+    }
+  }
+
+  // C'è qualcosa di sostanziale da salvare? (esclude i default di modulo vuoto:
+  // data odierna e nome autore precompilati) — evita bozze "vuote".
+  function hasContent() {
+    const f = collectFields()
+    const anyField = Object.entries(f).some(([k, v]) => k !== 'data_compilazione' && k !== 'autore' && String(v || '').trim() !== '')
+    return anyField || !!signatures().resp || !!signatures().ref
+  }
+
+  // Persistenza vera e propria (usata sia dal salvataggio manuale sia dall'autosave).
+  async function persist(nextStatus) {
+    const record = buildRapportinoRecord({ fields: collectFields(), signatures: signatures(), user, existing: recId ? { id: recId } : null, status: nextStatus })
+    const saved = await saveRapportino(record)
+    setRecId(saved.id)
+    setStatus(nextStatus)
+    setDirty(false)
+    onArchived?.(saved)
+    return saved
+  }
+
+  // Salvataggio manuale: 'archived' (archivio, visibile a tutti) o 'draft' (bozza).
+  async function salva(nextStatus) {
     if (archiving) return null
     setArchiveMsg('')
     setArchiving(true)
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
     try {
-      const fields = collectFields()
-      const signatures = {
-        resp: sigRespRef.current?.toDataURL?.() || null,
-        ref: sigRefRef.current?.toDataURL?.() || null,
-      }
-      const record = buildRapportinoRecord({ fields, signatures, user, existing: recId ? { id: recId } : null, status })
-      const saved = await saveRapportino(record)
-      setRecId(saved.id) // così un successivo salvataggio aggiorna, non duplica
-      setDirty(false)
-      setArchiveMsg(status === 'draft' ? '✓ Bozza salvata.' : (recId ? '✓ Rapportino aggiornato in archivio.' : '✓ Rapportino archiviato.'))
-      onArchived?.(saved)
+      const saved = await persist(nextStatus)
+      setAutoMsg('')
+      setArchiveMsg(nextStatus === 'draft' ? '✓ Bozza salvata.' : (recId ? '✓ Rapportino aggiornato in archivio.' : '✓ Rapportino archiviato.'))
       return saved
     } catch (err) {
       console.error('[rapportino] salvataggio fallito:', err)
@@ -379,6 +403,27 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
       setArchiving(false)
     }
   }
+
+  // AUTOSAVE: dopo una breve pausa dall'ultima modifica, salva automaticamente
+  // come bozza (o mantiene lo stato attuale se il rapportino è già in archivio,
+  // così l'autosave non lo "retrocede" a bozza). Silenzioso, con indicatore.
+  useEffect(() => {
+    if (!dirty) return undefined
+    const t = setTimeout(async () => {
+      if (archiving || !hasContent()) return
+      const eff = status || 'draft'
+      try {
+        setAutoMsg('Salvataggio automatico…')
+        await persist(eff)
+        const hh = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+        setAutoMsg(`Salvato automaticamente ${eff === 'draft' ? 'in bozze' : 'in archivio'} · ${hh}`)
+      } catch {
+        setAutoMsg('Salvataggio automatico non riuscito — salva a mano')
+      }
+    }, 2500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, dirty])
 
   // Uscita "protetta": se ci sono modifiche non salvate, chiede prima cosa fare.
   function attemptLeave(proceed) {
@@ -507,12 +552,13 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
           </div>
         </div>
       )}
+      {autoMsg && <p className="muted small rap-toolbar" style={{ marginTop: 0 }}>{autoMsg}</p>}
       {archiveMsg && <p className="muted small rap-toolbar" style={{ marginTop: 0 }}>{archiveMsg}</p>}
       {error && <p className="error rap-toolbar" style={{ marginTop: 0 }}>{error}</p>}
 
       <div className="rap-desk">
         <div className="rap-scroll">
-          <div className="rap-sheet" ref={sheetRef} onInput={() => setDirty(true)}>
+          <div className="rap-sheet" ref={sheetRef} onInput={() => markDirty()}>
 
             {/* ===== INTESTAZIONE ===== */}
             <table>
@@ -561,13 +607,13 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                   </td>
                   <td style={{ width: '34%' }} rowSpan={2}>
                     <div className="rap-lbl">Cliente (Indirizzo e Fatturazione)</div>
-                    <ClientField name="cliente_fatturazione" style={{ height: '120px' }} onChange={() => setDirty(true)} />
+                    <ClientField name="cliente_fatturazione" style={{ height: '120px' }} onChange={() => markDirty()} />
                   </td>
                 </tr>
                 <tr>
                   <td colSpan={2}>
                     <div className="rap-lbl">Cliente (Luogo della prestazione)</div>
-                    <ClientField name="cliente_luogo" style={{ height: '88px', fontSize: '15px' }} onChange={() => setDirty(true)} />
+                    <ClientField name="cliente_luogo" style={{ height: '88px', fontSize: '15px' }} onChange={() => markDirty()} />
                   </td>
                 </tr>
               </tbody>
@@ -654,9 +700,9 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                   <td>
                     <div className="rap-sig-head">
                       <span className="rap-sig-lbl">Firma del Responsabile</span>
-                      <button className="rap-clear no-print" onClick={() => { sigRespRef.current?.clear(); setDirty(true) }}>Cancella</button>
+                      <button className="rap-clear no-print" onClick={() => { sigRespRef.current?.clear(); markDirty() }}>Cancella</button>
                     </div>
-                    <SignaturePad ref={sigRespRef} height={96} initial={initial?.signatures?.resp || null} label="Firma del Responsabile" onChange={() => setDirty(true)} />
+                    <SignaturePad ref={sigRespRef} height={96} initial={initial?.signatures?.resp || null} label="Firma del Responsabile" onChange={() => markDirty()} />
                   </td>
                 </tr>
               </tbody>
@@ -676,9 +722,9 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                   <td style={{ width: '33%' }}>
                     <div className="rap-sig-head">
                       <span className="rap-sig-lbl">Firma del Referente</span>
-                      <button className="rap-clear no-print" onClick={() => { sigRefRef.current?.clear(); setDirty(true) }}>Cancella</button>
+                      <button className="rap-clear no-print" onClick={() => { sigRefRef.current?.clear(); markDirty() }}>Cancella</button>
                     </div>
-                    <SignaturePad ref={sigRefRef} height={88} initial={initial?.signatures?.ref || null} label="Firma del Referente" onChange={() => setDirty(true)} />
+                    <SignaturePad ref={sigRefRef} height={88} initial={initial?.signatures?.ref || null} label="Firma del Referente" onChange={() => markDirty()} />
                   </td>
                   <td style={{ width: '33%' }}>
                     <div className="rap-lbl rap-lbl-t">Note</div>
@@ -739,6 +785,7 @@ export default function RapportinoIntervento({ user, permConfig = null, register
         registerNavGuard={registerNavGuard}
         initial={view.record?.data || null}
         existingId={view.record?.id || null}
+        initialStatus={view.record?.status || null}
         onBack={() => { setView({ mode: 'list' }); refresh() }}
         onArchived={() => refresh()}
       />
