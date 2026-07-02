@@ -821,6 +821,7 @@ create table if not exists public.rapportini (
   author_id       text references public.profiles (id) on delete set null,
   author_name     text,
   intervention_id text,
+  client_id       text references public.clients (id) on delete set null,  -- legame anagrafica
   client_name     text,
   doc_date        text,
   status          text not null default 'archived',  -- 'archived' | 'draft'
@@ -832,6 +833,8 @@ create index if not exists rapportini_author_idx on public.rapportini (author_id
 -- Stato del rapportino: 'archived' (in archivio, visibile a tutti) o 'draft'
 -- (bozza personale dell'autore). Idempotente per i database già esistenti.
 alter table public.rapportini add column if not exists status text not null default 'archived';
+alter table public.rapportini add column if not exists client_id text references public.clients (id) on delete set null;
+create index if not exists rapportini_client_idx on public.rapportini (client_id);
 
 alter table public.rapportini enable row level security;
 drop policy if exists "rapportini_select_anon" on public.rapportini;

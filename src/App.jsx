@@ -57,6 +57,7 @@ export default function App() {
   const [fineModalSeen, setFineModalSeen] = useState(false)
   const [ackBusy, setAckBusy] = useState(false)
   const [cassettoSub, setCassettoSub] = useState(null) // sotto-sezione iniziale del cassetto
+  const [rapportinoToOpen, setRapportinoToOpen] = useState(null) // rapportino da aprire (es. dall'anagrafica)
   // Configurazione categorie/permessi (decide la visibilità delle aree).
   const [permConfig, setPermConfig] = useState(null)
   // `true` quando la configurazione permessi è stata caricata (o il tentativo è
@@ -265,7 +266,7 @@ export default function App() {
       <div className="app app-wide">
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
         <main className="content dashboard">
-          <ClientsAdmin />
+          <ClientsAdmin onOpenRapportino={(rec) => { setRapportinoToOpen(rec); setArea('rapportini') }} />
         </main>
       </div>
     )
@@ -297,7 +298,7 @@ export default function App() {
     return (
       <div className="app app-wide">
         <Header user={user} onLogout={() => guardedRun(handleLogout)} onBack={() => guardedRun(backToHub)} finesCount={unackFines.length} />
-        <RapportinoIntervento user={user} permConfig={permConfig} registerNavGuard={(fn) => { navGuardRef.current = fn }} />
+        <RapportinoIntervento user={user} permConfig={permConfig} registerNavGuard={(fn) => { navGuardRef.current = fn }} openRecord={rapportinoToOpen} onConsumedOpen={() => setRapportinoToOpen(null)} />
       </div>
     )
   }

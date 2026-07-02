@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react'
-import { listClients, upsertClient, deleteClient } from '../data/api.js'
+import { Fragment, useEffect, useState } from 'react'
+import { listClients, upsertClient, deleteClient, getAllRapportini } from '../data/api.js'
 import { searchAddress } from '../data/geocode.js'
+import { rapportinoLabel } from '../rapportini.js'
 import AddressAutocomplete from './AddressAutocomplete.jsx'
 
 // Anagrafica clienti: elenco e maschera di inserimento/modifica. L'indirizzo si
 // compila tramite i suggerimenti di OpenStreetMap, che forniscono anche le
 // coordinate usate per riconoscere il cliente in fase di timbratura.
-export default function ClientsAdmin() {
+export default function ClientsAdmin({ onOpenRapportino }) {
   const [clients, setClients] = useState([])
+  const [rapByClient, setRapByClient] = useState({}) // clientId -> rapportini archiviati
+  const [openClient, setOpenClient] = useState(null) // riga cliente espansa (rapportini)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(null) // null | 'new' | client
@@ -16,7 +19,14 @@ export default function ClientsAdmin() {
     setLoading(true)
     setError('')
     try {
-      setClients(await listClients())
+      const [cl, raps] = await Promise.all([listClients(), getAllRapportini().catch(() => [])])
+      setClients(cl)
+      const map = {}
+      for (const r of raps) {
+        if (r.status === 'draft' || !r.clientId) continue // solo archiviati e legati a un cliente
+        ;(map[r.clientId] = map[r.clientId] || []).push(r)
+      }
+      setRapByClient(map)
     } catch (err) {
       setError(err.message || 'Errore nel caricamento dei clienti.')
     } finally {
@@ -63,29 +73,59 @@ export default function ClientsAdmin() {
         <div className="table-wrap">
           <table className="dash-table">
             <thead>
-              <tr><th>Ragione sociale</th><th>Indirizzo</th><th>Posizione</th><th>Stato</th><th className="actions-col">Azioni</th></tr>
+              <tr><th>Ragione sociale</th><th>Indirizzo</th><th>Posizione</th><th>Rapportini</th><th>Stato</th><th className="actions-col">Azioni</th></tr>
             </thead>
             <tbody>
-              {clients.map((c) => (
-                <tr key={c.id}>
-                  <td data-label="Ragione sociale">{c.name}</td>
-                  <td data-label="Indirizzo">{c.address || '—'}</td>
-                  <td data-label="Posizione">
-                    {c.lat != null && c.lng != null
-                      ? <a href={`https://www.openstreetmap.org/?mlat=${c.lat}&mlon=${c.lng}#map=18/${c.lat}/${c.lng}`} target="_blank" rel="noreferrer">📍 mappa</a>
-                      : <span className="muted small">senza coordinate</span>}
-                  </td>
-                  <td data-label="Stato">
-                    {c.active
-                      ? <span className="badge badge-approved">attivo</span>
-                      : <span className="badge badge-muted">disattivo</span>}
-                  </td>
-                  <td data-label="Azioni" className="actions-col">
-                    <button className="btn-ghost btn-sm" onClick={() => setEditing(c)}>Modifica</button>
-                    <button className="btn-ghost btn-sm danger" onClick={() => remove(c)}>Elimina</button>
-                  </td>
-                </tr>
-              ))}
+              {clients.map((c) => {
+                const raps = rapByClient[c.id] || []
+                const open = openClient === c.id
+                return (
+                  <Fragment key={c.id}>
+                    <tr className={raps.length ? 'ts-row-click' : ''}>
+                      <td data-label="Ragione sociale">{c.name}</td>
+                      <td data-label="Indirizzo">{c.address || '—'}</td>
+                      <td data-label="Posizione">
+                        {c.lat != null && c.lng != null
+                          ? <a href={`https://www.openstreetmap.org/?mlat=${c.lat}&mlon=${c.lng}#map=18/${c.lat}/${c.lng}`} target="_blank" rel="noreferrer">📍 mappa</a>
+                          : <span className="muted small">senza coordinate</span>}
+                      </td>
+                      <td data-label="Rapportini">
+                        {raps.length === 0
+                          ? <span className="muted small">—</span>
+                          : (
+                            <button className="btn-ghost btn-sm" onClick={() => setOpenClient(open ? null : c.id)}>
+                              <span className="ts-caret" aria-hidden>{open ? '▾' : '▸'}</span> {raps.length}
+                            </button>
+                          )}
+                      </td>
+                      <td data-label="Stato">
+                        {c.active
+                          ? <span className="badge badge-approved">attivo</span>
+                          : <span className="badge badge-muted">disattivo</span>}
+                      </td>
+                      <td data-label="Azioni" className="actions-col">
+                        <button className="btn-ghost btn-sm" onClick={() => setEditing(c)}>Modifica</button>
+                        <button className="btn-ghost btn-sm danger" onClick={() => remove(c)}>Elimina</button>
+                      </td>
+                    </tr>
+                    {open && raps.length > 0 && (
+                      <tr className="cli-raps-row">
+                        <td colSpan={6}>
+                          <div className="cli-raps">
+                            {raps.map((r) => (
+                              <button key={r.id} className="cli-rap-item" onClick={() => onOpenRapportino?.(r)}>
+                                <span className="request-employee">{rapportinoLabel(r)}</span>
+                                <span className="muted small">{r.docDate || '—'}{r.authorName ? ` · ${r.authorName}` : ''}</span>
+                                <span className="area-arrow" aria-hidden>›</span>
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
