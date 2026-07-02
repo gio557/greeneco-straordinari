@@ -1,6 +1,7 @@
-import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react'
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react'
 import {
   saveRapportino, getAllRapportini, deleteRapportino, subscribeToRapportini,
+  listClients, upsertClient,
 } from '../data/api.js'
 import { useLiveData } from '../data/useLiveData.js'
 import { puo } from '../permissions.js'
@@ -130,6 +131,111 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 96, initial = n
 
   return <canvas ref={canvasRef} className="rap-sig" style={{ height: `${height}px` }} />
 })
+
+// Campo "Cliente" con selezione dall'anagrafica: al focus mostra i clienti già
+// in archivio (con ricerca mentre si scrive); selezionandone uno il campo si
+// compila con ragione sociale + indirizzo. Se il cliente non c'è, si può
+// scriverlo a mano (resta testo libero nel rapportino) oppure aggiungerlo
+// all'anagrafica per riutilizzarlo. La textarea mantiene il `name`, così
+// serializzazione, PDF e consultazione continuano a funzionare come prima.
+function ClientField({ name, style, placeholder }) {
+  const taRef = useRef(null)
+  const [clients, setClients] = useState([])
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [nc, setNc] = useState({ name: '', address: '' })
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    listClients().then((c) => { if (alive) setClients(c) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  const matches = useMemo(() => {
+    const s = q.trim().toLowerCase()
+    const base = clients.filter((c) => c.active !== false)
+    if (!s) return base.slice(0, 8)
+    return base.filter((c) => `${c.name} ${c.address || ''}`.toLowerCase().includes(s)).slice(0, 8)
+  }, [clients, q])
+
+  function fill(c) {
+    const text = c.address ? `${c.name}\n${c.address}` : c.name
+    if (taRef.current) taRef.current.value = text
+    setOpen(false)
+    setAdding(false)
+  }
+
+  async function addNew(e) {
+    e.preventDefault()
+    const nm = nc.name.trim()
+    if (!nm || busy) return
+    setBusy(true)
+    try {
+      const saved = await upsertClient({ name: nm, address: nc.address.trim() })
+      setClients((prev) => [...prev.filter((x) => x.id !== saved.id), saved])
+      fill(saved)
+      setNc({ name: '', address: '' })
+    } catch { /* ignora: in caso di errore resta il testo libero */ } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="rap-client"
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { setOpen(false); setAdding(false) } }}
+    >
+      <textarea
+        ref={taRef}
+        className="rap-ta"
+        name={name}
+        style={style}
+        placeholder={placeholder}
+        onFocus={() => setOpen(true)}
+        onInput={(e) => { setQ(e.target.value); setOpen(true) }}
+      />
+      {open && (
+        <div className="rap-client-menu no-print">
+          {matches.length > 0 ? (
+            <ul className="rap-client-list">
+              {matches.map((c) => (
+                <li key={c.id}>
+                  <button type="button" className="rap-client-opt" onMouseDown={(e) => e.preventDefault()} onClick={() => fill(c)}>
+                    <span className="rap-client-name">{c.name}</span>
+                    {c.address && <span className="muted small">{c.address}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="rap-client-none muted small">Nessun cliente in anagrafica con questo testo.</div>
+          )}
+          {!adding ? (
+            <button
+              type="button"
+              className="rap-client-add"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { setAdding(true); setNc({ name: q.trim(), address: '' }) }}
+            >
+              ＋ Aggiungi nuovo cliente all'anagrafica
+            </button>
+          ) : (
+            <form className="rap-client-form" onSubmit={addNew}>
+              <input placeholder="Ragione sociale" value={nc.name} onChange={(e) => setNc((v) => ({ ...v, name: e.target.value }))} />
+              <input placeholder="Indirizzo (facoltativo)" value={nc.address} onChange={(e) => setNc((v) => ({ ...v, address: e.target.value }))} />
+              <div className="rap-client-form-actions">
+                <button type="submit" className="btn-primary btn-sm" disabled={busy || !nc.name.trim()}>{busy ? 'Salvataggio…' : 'Aggiungi'}</button>
+                <button type="button" className="btn-ghost btn-sm" onClick={() => setAdding(false)}>Annulla</button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Una riga della tabella orari: 15 celle compilabili (Data, viaggio, lavorazione,
 // ore effettive, km). Ogni cella ha un `name` stabile per l'archiviazione.
@@ -330,13 +436,13 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                   </td>
                   <td style={{ width: '34%' }} rowSpan={2}>
                     <div className="rap-lbl">Cliente (Indirizzo e Fatturazione)</div>
-                    <textarea className="rap-ta" name="cliente_fatturazione" style={{ height: '120px' }} />
+                    <ClientField name="cliente_fatturazione" style={{ height: '120px' }} />
                   </td>
                 </tr>
                 <tr>
                   <td colSpan={2}>
                     <div className="rap-lbl">Cliente (Luogo della prestazione)</div>
-                    <textarea className="rap-ta" name="cliente_luogo" style={{ height: '88px', fontSize: '15px' }} />
+                    <ClientField name="cliente_luogo" style={{ height: '88px', fontSize: '15px' }} />
                   </td>
                 </tr>
               </tbody>
