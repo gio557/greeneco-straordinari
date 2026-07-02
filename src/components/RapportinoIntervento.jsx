@@ -25,94 +25,104 @@ function oggiLabel() {
   return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`
 }
 
-// Riquadro firma disegnabile: pointer events (touch/penna/mouse) + scala per la
-// densità di pixel del dispositivo, così il tratto resta nitido anche in PDF.
-// `initial` (data URL) ridisegna una firma già archiviata in consultazione.
-const SignaturePad = forwardRef(function SignaturePad({ height = 96, initial = null }, ref) {
-  const canvasRef = useRef(null)
+// Riquadro firma. Nel modulo mostra la firma in piccolo (sola visualizzazione);
+// TOCCANDOLO si apre a tutto schermo un'area di firma grande ("esplosione") per
+// firmare comodi. Sotto il campo grande c'è "Conferma": riporta la firma
+// (ritagliata e ridimensionata) nel riquadro originale. `initial` (data URL)
+// mostra una firma già archiviata in consultazione.
+const SignaturePad = forwardRef(function SignaturePad({ height = 96, initial = null, label = 'Firma' }, ref) {
+  const smallRef = useRef(null)
+  const bigRef = useRef(null)
   const drawnRef = useRef(false)
+  const bboxRef = useRef(null)      // riquadro dei tratti nel canvas grande (px CSS)
+  const bigMetaRef = useRef(null)   // { ratio } del canvas grande
+  const [expanded, setExpanded] = useState(false)
 
   useImperativeHandle(ref, () => ({
     clear() {
-      const c = canvasRef.current
+      const c = smallRef.current
       if (!c) return
       const ctx = c.getContext('2d')
-      ctx.save()
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.clearRect(0, 0, c.width, c.height)
-      ctx.restore()
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height); ctx.restore()
       drawnRef.current = false
     },
-    // Data URL della firma, o null se il riquadro è vuoto (niente da archiviare).
     toDataURL() {
-      const c = canvasRef.current
+      const c = smallRef.current
       if (!c || !drawnRef.current) return null
       try { return c.toDataURL('image/png') } catch { return null }
     },
   }))
 
+  // Dimensiona il riquadro piccolo e, in consultazione, vi disegna la firma
+  // archiviata (adattata mantenendo le proporzioni).
   useEffect(() => {
-    const canvas = canvasRef.current
+    const canvas = smallRef.current
     if (!canvas) return
-    let cleanup = () => {}
-
-    // Attende il layout: dentro una tabella la larghezza è nota solo dopo il
-    // primo frame. Se non è ancora pronta, riprova al frame successivo.
     let raf = 0
     function init() {
       const rect = canvas.getBoundingClientRect()
-      if (rect.width === 0) {
-        raf = requestAnimationFrame(init)
-        return
+      if (rect.width === 0) { raf = requestAnimationFrame(init); return }
+      const ratio = window.devicePixelRatio || 1
+      canvas.width = Math.round(rect.width * ratio)
+      canvas.height = Math.round(rect.height * ratio)
+      if (initial) {
+        const img = new Image()
+        img.onload = () => {
+          const dW = canvas.width, dH = canvas.height
+          const s = Math.min(dW / img.width, dH / img.height)
+          const dw = img.width * s, dh = img.height * s
+          canvas.getContext('2d').drawImage(img, (dW - dw) / 2, (dH - dh) / 2, dw, dh)
+          drawnRef.current = true
+        }
+        img.src = initial
       }
+    }
+    init()
+    return () => cancelAnimationFrame(raf)
+  }, [initial])
+
+  // Canvas grande (overlay): disegno a mano libera + traccia del riquadro dei tratti.
+  useEffect(() => {
+    if (!expanded) return
+    const canvas = bigRef.current
+    if (!canvas) return
+    let raf = 0
+    let cleanup = () => {}
+    function init() {
+      const rect = canvas.getBoundingClientRect()
+      if (rect.width === 0) { raf = requestAnimationFrame(init); return }
       const ratio = window.devicePixelRatio || 1
       canvas.width = Math.round(rect.width * ratio)
       canvas.height = Math.round(rect.height * ratio)
       const ctx = canvas.getContext('2d')
       ctx.scale(ratio, ratio)
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      const cssWidth = rect.width
-      const cssHeight = rect.height
-
-      // Consultazione: ridisegna la firma archiviata (scalata al riquadro).
-      if (initial) {
-        const img = new Image()
-        img.onload = () => { ctx.drawImage(img, 0, 0, cssWidth, cssHeight); drawnRef.current = true }
-        img.src = initial
-      }
-
-      let drawing = false
-      let last = null
-
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = INK; ctx.lineWidth = 4
+      const cssW = rect.width
+      bboxRef.current = null
+      bigMetaRef.current = { ratio }
+      let drawing = false, last = null
       const pt = (e) => {
         const r = canvas.getBoundingClientRect()
-        const s = cssWidth / r.width
+        const s = cssW / r.width
         return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s }
       }
+      const grow = (p) => {
+        const b = bboxRef.current
+        if (!b) bboxRef.current = { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y }
+        else { b.minX = Math.min(b.minX, p.x); b.minY = Math.min(b.minY, p.y); b.maxX = Math.max(b.maxX, p.x); b.maxY = Math.max(b.maxY, p.y) }
+      }
       const down = (e) => {
-        e.preventDefault()
-        drawing = true
-        drawnRef.current = true
-        last = pt(e)
-        if (canvas.setPointerCapture) {
-          try { canvas.setPointerCapture(e.pointerId) } catch { /* ignore */ }
-        }
+        e.preventDefault(); drawing = true; last = pt(e); grow(last)
+        if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId) } catch { /* ignore */ } }
       }
       const move = (e) => {
         if (!drawing) return
         e.preventDefault()
         const p = pt(e)
-        ctx.strokeStyle = INK
-        ctx.lineWidth = PEN_WIDTH
-        ctx.beginPath()
-        ctx.moveTo(last.x, last.y)
-        ctx.lineTo(p.x, p.y)
-        ctx.stroke()
-        last = p
+        ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke()
+        grow(p); last = p
       }
       const up = () => { drawing = false }
-
       canvas.addEventListener('pointerdown', down)
       canvas.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
@@ -123,13 +133,65 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 96, initial = n
       }
     }
     init()
-    return () => {
-      cancelAnimationFrame(raf)
-      cleanup()
-    }
-  }, [initial])
+    return () => { cancelAnimationFrame(raf); cleanup() }
+  }, [expanded])
 
-  return <canvas ref={canvasRef} className="rap-sig" style={{ height: `${height}px` }} />
+  function clearBig() {
+    const c = bigRef.current
+    if (!c) return
+    const ctx = c.getContext('2d')
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height); ctx.restore()
+    bboxRef.current = null
+  }
+
+  // "Conferma": ritaglia la firma disegnata in grande e la riporta nel riquadro
+  // piccolo mantenendo le proporzioni (centrata). Se non è stato disegnato nulla,
+  // il riquadro piccolo resta com'era.
+  function confirm() {
+    const big = bigRef.current, small = smallRef.current, b = bboxRef.current, meta = bigMetaRef.current
+    if (big && small && b && meta) {
+      const pad = 10
+      const sx = Math.max(0, (b.minX - pad)) * meta.ratio
+      const sy = Math.max(0, (b.minY - pad)) * meta.ratio
+      const sw = (b.maxX - b.minX + pad * 2) * meta.ratio
+      const sh = (b.maxY - b.minY + pad * 2) * meta.ratio
+      const dW = small.width, dH = small.height
+      const scale = Math.min(dW / sw, dH / sh)
+      const dw = sw * scale, dh = sh * scale
+      const dx = (dW - dw) / 2, dy = (dH - dh) / 2
+      const sctx = small.getContext('2d')
+      sctx.save(); sctx.setTransform(1, 0, 0, 1, 0, 0); sctx.clearRect(0, 0, dW, dH)
+      sctx.drawImage(big, sx, sy, sw, sh, dx, dy, dw, dh)
+      sctx.restore()
+      drawnRef.current = true
+    }
+    setExpanded(false)
+  }
+
+  return (
+    <>
+      <canvas
+        ref={smallRef}
+        className="rap-sig"
+        style={{ height: `${height}px`, cursor: 'pointer' }}
+        title="Tocca per firmare in grande"
+        onClick={() => setExpanded(true)}
+      />
+      {expanded && (
+        <div className="sig-overlay no-print" onClick={() => setExpanded(false)}>
+          <div className="sig-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sig-modal-head">{label} — firma qui</div>
+            <canvas ref={bigRef} className="sig-big" />
+            <div className="sig-modal-actions">
+              <button type="button" className="btn-ghost" onClick={clearBig}>Cancella</button>
+              <button type="button" className="btn-ghost" onClick={() => setExpanded(false)}>Annulla</button>
+              <button type="button" className="btn-primary" onClick={confirm}>Conferma</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
 })
 
 // Campo "Cliente" con selezione dall'anagrafica: al focus mostra i clienti già
@@ -535,7 +597,7 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                       <span className="rap-sig-lbl">Firma del Responsabile</span>
                       <button className="rap-clear no-print" onClick={() => sigRespRef.current?.clear()}>Cancella</button>
                     </div>
-                    <SignaturePad ref={sigRespRef} height={96} initial={initial?.signatures?.resp || null} />
+                    <SignaturePad ref={sigRespRef} height={96} initial={initial?.signatures?.resp || null} label="Firma del Responsabile" />
                   </td>
                 </tr>
               </tbody>
@@ -557,7 +619,7 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                       <span className="rap-sig-lbl">Firma del Referente</span>
                       <button className="rap-clear no-print" onClick={() => sigRefRef.current?.clear()}>Cancella</button>
                     </div>
-                    <SignaturePad ref={sigRefRef} height={88} initial={initial?.signatures?.ref || null} />
+                    <SignaturePad ref={sigRefRef} height={88} initial={initial?.signatures?.ref || null} label="Firma del Referente" />
                   </td>
                   <td style={{ width: '33%' }}>
                     <div className="rap-lbl rap-lbl-t">Note</div>
