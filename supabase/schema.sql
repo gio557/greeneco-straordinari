@@ -823,11 +823,15 @@ create table if not exists public.rapportini (
   intervention_id text,
   client_name     text,
   doc_date        text,
+  status          text not null default 'archived',  -- 'archived' | 'draft'
   data            jsonb not null default '{}'::jsonb,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
 create index if not exists rapportini_author_idx on public.rapportini (author_id);
+-- Stato del rapportino: 'archived' (in archivio, visibile a tutti) o 'draft'
+-- (bozza personale dell'autore). Idempotente per i database già esistenti.
+alter table public.rapportini add column if not exists status text not null default 'archived';
 
 alter table public.rapportini enable row level security;
 drop policy if exists "rapportini_select_anon" on public.rapportini;

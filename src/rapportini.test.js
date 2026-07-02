@@ -39,6 +39,12 @@ test('buildRapportinoRecord: nuovo record (senza id) porta autore e dati complet
   assert.equal(rec.data.fields.descrizione, 'Sostituita pompa')
   assert.equal(rec.data.signatures.resp, 'data:image/png;base64,xxx')
   assert.equal(rec.data.signatures.ref, null)
+  assert.equal(rec.status, 'archived') // default
+})
+
+test('buildRapportinoRecord: status esplicito (bozza) viene mantenuto', () => {
+  const rec = buildRapportinoRecord({ fields: { id: 'B-1' }, user: { id: 'e', name: 'E' }, status: 'draft' })
+  assert.equal(rec.status, 'draft')
 })
 
 test('buildRapportinoRecord: con existing → aggiornamento (mantiene id)', () => {

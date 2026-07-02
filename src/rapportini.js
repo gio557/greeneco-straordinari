@@ -28,7 +28,7 @@ export function summarizeRapportino(fields = {}) {
 // presente) porta l'id del rapportino già archiviato → aggiornamento anziché
 // nuovo inserimento. I dati completi (campi + firme) restano in `data`, così il
 // rapportino è auto-contenuto e ricomponibile in consultazione/PDF.
-export function buildRapportinoRecord({ fields = {}, signatures = {}, user = null, existing = null } = {}) {
+export function buildRapportinoRecord({ fields = {}, signatures = {}, user = null, existing = null, status = 'archived' } = {}) {
   const s = summarizeRapportino(fields)
   return {
     id: existing?.id,
@@ -37,6 +37,7 @@ export function buildRapportinoRecord({ fields = {}, signatures = {}, user = nul
     interventionId: s.interventionId,
     clientName: s.clientName,
     docDate: s.docDate,
+    status,
     data: { fields, signatures },
   }
 }

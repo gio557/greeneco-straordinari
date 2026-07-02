@@ -908,6 +908,7 @@ function rowToRapportino(r) {
     interventionId: r.intervention_id ?? '',
     clientName: r.client_name ?? '',
     docDate: r.doc_date ?? '',
+    status: r.status || 'archived',
     data: r.data ?? {},
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -923,6 +924,7 @@ export async function saveRapportino(rec) {
     intervention_id: rec.interventionId ?? null,
     client_name: rec.clientName ?? null,
     doc_date: rec.docDate ?? null,
+    status: rec.status || 'archived',
     data: rec.data ?? {},
     updated_at: new Date().toISOString(),
   }

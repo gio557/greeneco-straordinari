@@ -72,6 +72,7 @@ function load() {
         interventionId: 'MAN-2026-014',
         clientName: 'Acme S.p.A. — Via Roma 1, Torino',
         docDate: '12-06-2026',
+        status: 'archived',
         data: {
           fields: {
             id: 'MAN-2026-014',
@@ -355,6 +356,7 @@ export async function saveRapportino(rec) {
     interventionId: rec.interventionId ?? '',
     clientName: rec.clientName ?? '',
     docDate: rec.docDate ?? '',
+    status: rec.status || 'archived',
     data: rec.data ?? {},
     createdAt: idx >= 0 ? state.rapportini[idx].createdAt : now,
     updatedAt: now,
