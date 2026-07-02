@@ -30,7 +30,7 @@ function oggiLabel() {
 // firmare comodi. Sotto il campo grande c'è "Conferma": riporta la firma
 // (ritagliata e ridimensionata) nel riquadro originale. `initial` (data URL)
 // mostra una firma già archiviata in consultazione.
-const SignaturePad = forwardRef(function SignaturePad({ height = 96, initial = null, label = 'Firma' }, ref) {
+const SignaturePad = forwardRef(function SignaturePad({ height = 96, initial = null, label = 'Firma', onChange }, ref) {
   const smallRef = useRef(null)
   const bigRef = useRef(null)
   const drawnRef = useRef(false)
@@ -164,6 +164,7 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 96, initial = n
       sctx.drawImage(big, sx, sy, sw, sh, dx, dy, dw, dh)
       sctx.restore()
       drawnRef.current = true
+      onChange?.()
     }
     setExpanded(false)
   }
@@ -200,7 +201,7 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 96, initial = n
 // scriverlo a mano (resta testo libero nel rapportino) oppure aggiungerlo
 // all'anagrafica per riutilizzarlo. La textarea mantiene il `name`, così
 // serializzazione, PDF e consultazione continuano a funzionare come prima.
-function ClientField({ name, style, placeholder }) {
+function ClientField({ name, style, placeholder, onChange }) {
   const taRef = useRef(null)
   const [clients, setClients] = useState([])
   const [open, setOpen] = useState(false)
@@ -231,6 +232,7 @@ function ClientField({ name, style, placeholder }) {
     if (taRef.current) taRef.current.value = text
     setOpen(false)
     setAdding(false)
+    onChange?.()
   }
 
   async function addNew(e) {
@@ -321,7 +323,7 @@ function TimeRow({ row }) {
 // MODULO compilabile (nuovo o in consultazione). Uncontrolled: i valori si
 // leggono/scrivono dal DOM tramite `name`, così il modulo resta leggero.
 // ---------------------------------------------------------------------------
-function RapportinoForm({ user, initial = null, existingId = null, onBack, onArchived }) {
+function RapportinoForm({ user, initial = null, existingId = null, onBack, onArchived, registerNavGuard }) {
   const sheetRef = useRef(null)
   const sigRespRef = useRef(null)
   const sigRefRef = useRef(null)
@@ -330,6 +332,8 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
   const [archiving, setArchiving] = useState(false)
   const [archiveMsg, setArchiveMsg] = useState('')
   const [recId, setRecId] = useState(existingId)
+  const [dirty, setDirty] = useState(false)         // modifiche non salvate
+  const [leavePrompt, setLeavePrompt] = useState(null) // { proceed } quando si sta uscendo
 
   // Consultazione: ripopola i campi (uncontrolled) dal record archiviato.
   useEffect(() => {
@@ -348,8 +352,9 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
     return fields
   }
 
-  async function salvaArchivio() {
-    if (archiving) return
+  // Salvataggio: status 'archived' (archivio, visibile a tutti) o 'draft' (bozza).
+  async function salva(status) {
+    if (archiving) return null
     setArchiveMsg('')
     setArchiving(true)
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
@@ -359,18 +364,56 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
         resp: sigRespRef.current?.toDataURL?.() || null,
         ref: sigRefRef.current?.toDataURL?.() || null,
       }
-      const record = buildRapportinoRecord({ fields, signatures, user, existing: recId ? { id: recId } : null })
+      const record = buildRapportinoRecord({ fields, signatures, user, existing: recId ? { id: recId } : null, status })
       const saved = await saveRapportino(record)
       setRecId(saved.id) // così un successivo salvataggio aggiorna, non duplica
-      setArchiveMsg(recId ? '✓ Rapportino aggiornato in archivio.' : '✓ Rapportino archiviato.')
+      setDirty(false)
+      setArchiveMsg(status === 'draft' ? '✓ Bozza salvata.' : (recId ? '✓ Rapportino aggiornato in archivio.' : '✓ Rapportino archiviato.'))
       onArchived?.(saved)
+      return saved
     } catch (err) {
-      console.error('[rapportino] archiviazione fallita:', err)
-      setArchiveMsg('Archiviazione non riuscita. Riprova.')
+      console.error('[rapportino] salvataggio fallito:', err)
+      setArchiveMsg('Salvataggio non riuscito. Riprova.')
+      throw err
     } finally {
       setArchiving(false)
     }
   }
+
+  // Uscita "protetta": se ci sono modifiche non salvate, chiede prima cosa fare.
+  function attemptLeave(proceed) {
+    if (dirty) setLeavePrompt({ proceed })
+    else proceed()
+  }
+
+  async function leaveWith(status) {
+    const p = leavePrompt?.proceed
+    try { await salva(status) } catch { return } // se il salvataggio fallisce resta nel modulo
+    setLeavePrompt(null)
+    p?.()
+  }
+  function leaveDiscard() {
+    const p = leavePrompt?.proceed
+    setDirty(false); setLeavePrompt(null)
+    p?.()
+  }
+
+  // Registra la "guardia" per le uscite gestite dall'app (back dell'header,
+  // logout): attiva solo quando ci sono modifiche non salvate.
+  useEffect(() => {
+    if (!registerNavGuard) return undefined
+    registerNavGuard(dirty ? attemptLeave : null)
+    return () => registerNavGuard(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty])
+
+  // Chiusura/refresh del browser: avviso nativo se ci sono modifiche non salvate.
+  useEffect(() => {
+    if (!dirty) return undefined
+    const h = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', h)
+    return () => window.removeEventListener('beforeunload', h)
+  }, [dirty])
 
   async function salvaPdf() {
     const sheet = sheetRef.current
@@ -435,25 +478,41 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
   return (
     <main className="content rapportino">
       <div className="rap-toolbar no-print">
-        <button className="back-link" onClick={onBack}>‹ Archivio rapportini</button>
+        <button className="back-link" onClick={() => attemptLeave(onBack)}>‹ Archivio rapportini</button>
         <span className="rap-toolbar-title">
           {recId ? 'Rapportino d\'intervento · consultazione' : 'Rapportino d\'intervento · nuovo'}
         </span>
         <div className="rap-toolbar-actions">
-          <button className="btn-ghost" onClick={salvaArchivio} disabled={archiving}>
-            {archiving ? 'Archiviazione…' : (recId ? 'Aggiorna archivio' : 'Salva in archivio')}
+          <button className="btn-ghost" onClick={() => salva('draft')} disabled={archiving}>Salva in bozze</button>
+          <button className="btn-ghost" onClick={() => salva('archived')} disabled={archiving}>
+            {archiving ? 'Salvataggio…' : (recId ? 'Aggiorna archivio' : 'Salva in archivio')}
           </button>
           <button className="btn-primary" onClick={salvaPdf} disabled={saving}>
             {saving ? 'Generazione…' : 'Salva PDF'}
           </button>
         </div>
       </div>
+
+      {leavePrompt && (
+        <div className="modal-overlay no-print" onClick={() => setLeavePrompt(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mini-title">Salvare il rapportino?</h3>
+            <p className="muted small">Ci sono modifiche non salvate. Cosa vuoi fare prima di uscire?</p>
+            <div className="form-actions" style={{ flexWrap: 'wrap' }}>
+              <button className="btn-primary" disabled={archiving} onClick={() => leaveWith('archived')}>Salva in archivio</button>
+              <button className="btn-ghost" disabled={archiving} onClick={() => leaveWith('draft')}>Salva in bozze</button>
+              <button className="btn-ghost danger" disabled={archiving} onClick={leaveDiscard}>Esci senza salvare</button>
+              <button className="btn-ghost" disabled={archiving} onClick={() => setLeavePrompt(null)}>Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
       {archiveMsg && <p className="muted small rap-toolbar" style={{ marginTop: 0 }}>{archiveMsg}</p>}
       {error && <p className="error rap-toolbar" style={{ marginTop: 0 }}>{error}</p>}
 
       <div className="rap-desk">
         <div className="rap-scroll">
-          <div className="rap-sheet" ref={sheetRef}>
+          <div className="rap-sheet" ref={sheetRef} onInput={() => setDirty(true)}>
 
             {/* ===== INTESTAZIONE ===== */}
             <table>
@@ -502,13 +561,13 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                   </td>
                   <td style={{ width: '34%' }} rowSpan={2}>
                     <div className="rap-lbl">Cliente (Indirizzo e Fatturazione)</div>
-                    <ClientField name="cliente_fatturazione" style={{ height: '120px' }} />
+                    <ClientField name="cliente_fatturazione" style={{ height: '120px' }} onChange={() => setDirty(true)} />
                   </td>
                 </tr>
                 <tr>
                   <td colSpan={2}>
                     <div className="rap-lbl">Cliente (Luogo della prestazione)</div>
-                    <ClientField name="cliente_luogo" style={{ height: '88px', fontSize: '15px' }} />
+                    <ClientField name="cliente_luogo" style={{ height: '88px', fontSize: '15px' }} onChange={() => setDirty(true)} />
                   </td>
                 </tr>
               </tbody>
@@ -595,9 +654,9 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                   <td>
                     <div className="rap-sig-head">
                       <span className="rap-sig-lbl">Firma del Responsabile</span>
-                      <button className="rap-clear no-print" onClick={() => sigRespRef.current?.clear()}>Cancella</button>
+                      <button className="rap-clear no-print" onClick={() => { sigRespRef.current?.clear(); setDirty(true) }}>Cancella</button>
                     </div>
-                    <SignaturePad ref={sigRespRef} height={96} initial={initial?.signatures?.resp || null} label="Firma del Responsabile" />
+                    <SignaturePad ref={sigRespRef} height={96} initial={initial?.signatures?.resp || null} label="Firma del Responsabile" onChange={() => setDirty(true)} />
                   </td>
                 </tr>
               </tbody>
@@ -617,9 +676,9 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
                   <td style={{ width: '33%' }}>
                     <div className="rap-sig-head">
                       <span className="rap-sig-lbl">Firma del Referente</span>
-                      <button className="rap-clear no-print" onClick={() => sigRefRef.current?.clear()}>Cancella</button>
+                      <button className="rap-clear no-print" onClick={() => { sigRefRef.current?.clear(); setDirty(true) }}>Cancella</button>
                     </div>
-                    <SignaturePad ref={sigRefRef} height={88} initial={initial?.signatures?.ref || null} label="Firma del Referente" />
+                    <SignaturePad ref={sigRefRef} height={88} initial={initial?.signatures?.ref || null} label="Firma del Referente" onChange={() => setDirty(true)} />
                   </td>
                   <td style={{ width: '33%' }}>
                     <div className="rap-lbl rap-lbl-t">Note</div>
@@ -643,7 +702,7 @@ function RapportinoForm({ user, initial = null, existingId = null, onBack, onArc
 // e a chi ha la visibilità estesa (dati.tutti), per evitare cancellazioni
 // accidentali del lavoro altrui.
 // ---------------------------------------------------------------------------
-export default function RapportinoIntervento({ user, permConfig = null }) {
+export default function RapportinoIntervento({ user, permConfig = null, registerNavGuard }) {
   const canDeleteAny = puo(user, 'dati.tutti', permConfig)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -657,7 +716,8 @@ export default function RapportinoIntervento({ user, permConfig = null }) {
   useLiveData(refresh, [user.id], subscribeToRapportini)
 
   async function remove(rec) {
-    if (!window.confirm('Eliminare questo rapportino dall\'archivio?')) return
+    const what = rec.status === 'draft' ? 'questa bozza' : 'questo rapportino dall\'archivio'
+    if (!window.confirm(`Eliminare ${what}?`)) return
     await deleteRapportino(rec.id)
     await refresh()
   }
@@ -666,6 +726,7 @@ export default function RapportinoIntervento({ user, permConfig = null }) {
     return (
       <RapportinoForm
         user={user}
+        registerNavGuard={registerNavGuard}
         onBack={() => { setView({ mode: 'list' }); refresh() }}
         onArchived={() => refresh()}
       />
@@ -675,6 +736,7 @@ export default function RapportinoIntervento({ user, permConfig = null }) {
     return (
       <RapportinoForm
         user={user}
+        registerNavGuard={registerNavGuard}
         initial={view.record?.data || null}
         existingId={view.record?.id || null}
         onBack={() => { setView({ mode: 'list' }); refresh() }}
@@ -683,42 +745,56 @@ export default function RapportinoIntervento({ user, permConfig = null }) {
     )
   }
 
+  // Bozze: solo le proprie (WIP privato). Archivio: tutti i rapportini archiviati.
+  const drafts = items.filter((r) => r.status === 'draft' && r.authorId === user.id)
+  const archived = items.filter((r) => r.status !== 'draft')
+
+  const renderItem = (r) => (
+    <div key={r.id} className="card fine-card">
+      <button className="rap-item" onClick={() => setView({ mode: 'view', record: r })}>
+        <span className="rap-item-main">
+          <span className="request-employee">
+            {rapportinoLabel(r)}{r.status === 'draft' ? ' · bozza' : ''}
+          </span>
+          {r.clientName && <span className="muted small">{r.clientName}</span>}
+          <span className="muted small">{r.docDate || '—'}{r.authorName ? ` · ${r.authorName}` : ''}</span>
+        </span>
+        <span className="area-arrow" aria-hidden>›</span>
+      </button>
+      {(canDeleteAny || r.authorId === user.id) && (
+        <div className="decision-actions">
+          <button className="btn-ghost btn-sm danger" onClick={() => remove(r)}>Elimina</button>
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <main className="content">
       <div className="page-head">
         <h2 className="section-title">Rapportini d'intervento</h2>
         <button className="btn-primary btn-sm" onClick={() => setView({ mode: 'new' })}>+ Nuovo rapportino</button>
       </div>
-      <p className="muted small">
-        Archivio di tutti i rapportini. Tocca una voce per consultarla o esportarla in PDF.
-      </p>
 
       {loading ? (
         <p className="muted center">Caricamento…</p>
-      ) : items.length === 0 ? (
-        <p className="muted small">Nessun rapportino archiviato. Premi “+ Nuovo rapportino” per compilarne uno.</p>
       ) : (
-        <div className="list">
-          {items.map((r) => (
-            <div key={r.id} className="card fine-card">
-              <button className="rap-item" onClick={() => setView({ mode: 'view', record: r })}>
-                <span className="rap-item-main">
-                  <span className="request-employee">{rapportinoLabel(r)}</span>
-                  {r.clientName && <span className="muted small">{r.clientName}</span>}
-                  <span className="muted small">
-                    {r.docDate || '—'}{r.authorName ? ` · ${r.authorName}` : ''}
-                  </span>
-                </span>
-                <span className="area-arrow" aria-hidden>›</span>
-              </button>
-              {(canDeleteAny || r.authorId === user.id) && (
-                <div className="decision-actions">
-                  <button className="btn-ghost btn-sm danger" onClick={() => remove(r)}>Elimina</button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <>
+          {drafts.length > 0 && (
+            <section style={{ marginBottom: 18 }}>
+              <h3 className="mini-title">Le tue bozze</h3>
+              <p className="muted small">Rapportini non ancora archiviati. Li vedi solo tu.</p>
+              <div className="list">{drafts.map(renderItem)}</div>
+            </section>
+          )}
+          <section>
+            <h3 className="mini-title">Archivio</h3>
+            <p className="muted small">Tutti i rapportini archiviati. Tocca una voce per consultarla o esportarla in PDF.</p>
+            {archived.length === 0
+              ? <p className="muted small">Nessun rapportino archiviato. Premi “+ Nuovo rapportino” per compilarne uno.</p>
+              : <div className="list">{archived.map(renderItem)}</div>}
+          </section>
+        </>
       )}
     </main>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { login, getFinesForEmployee, acknowledgeFine, getPermissionsConfig } from './data/api.js'
 import { puo } from './permissions.js'
 import Welcome from './components/Welcome.jsx'
@@ -130,6 +130,16 @@ export default function App() {
     setFines([])
     setFineModalSeen(false)
     setCassettoSub(null)
+  }
+
+  // Guardia "uscita non salvata": una schermata (es. il rapportino) può
+  // registrare una funzione che intercetta le uscite gestite dall'app (back
+  // dell'header, logout) per proporre di salvare prima di lasciare la pagina.
+  const navGuardRef = useRef(null)
+  function guardedRun(action) {
+    const guard = navGuardRef.current
+    if (guard) guard(action)
+    else action()
   }
 
   function backToHub() {
@@ -286,8 +296,8 @@ export default function App() {
   if (area === 'rapportini') {
     return (
       <div className="app app-wide">
-        <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
-        <RapportinoIntervento user={user} permConfig={permConfig} />
+        <Header user={user} onLogout={() => guardedRun(handleLogout)} onBack={() => guardedRun(backToHub)} finesCount={unackFines.length} />
+        <RapportinoIntervento user={user} permConfig={permConfig} registerNavGuard={(fn) => { navGuardRef.current = fn }} />
       </div>
     )
   }
