@@ -156,8 +156,12 @@ function ClientField({ name, style, placeholder }) {
   const matches = useMemo(() => {
     const s = q.trim().toLowerCase()
     const base = clients.filter((c) => c.active !== false)
-    if (!s) return base.slice(0, 8)
-    return base.filter((c) => `${c.name} ${c.address || ''}`.toLowerCase().includes(s)).slice(0, 8)
+    const list = s
+      ? base.filter((c) => `${c.name} ${c.address || ''}`.toLowerCase().includes(s))
+      : base
+    // Mostra TUTTI i clienti (la lista è scorrevole); il tetto alto è solo una
+    // salvaguardia per anagrafiche enormi.
+    return list.slice(0, 300)
   }, [clients, q])
 
   function fill(c) {
