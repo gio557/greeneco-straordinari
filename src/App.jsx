@@ -22,6 +22,29 @@ import ComingSoon from './components/ComingSoon.jsx'
 
 const SESSION_KEY = 'straordinari_session'
 
+// Schermata di attesa mostrata dopo l'accesso mentre si caricano i permessi.
+// Ha la stessa intestazione dell'hub (barra utente + logo) così il passaggio
+// alla griglia delle aree è fluido, senza salti né schede che lampeggiano.
+function HubLoading({ user, onLogout }) {
+  return (
+    <div className="hub">
+      {user && (
+        <div className="hub-userbar">
+          <span className="hub-user">
+            {user.name}{user.department ? ` · ${user.department}` : ''}
+          </span>
+          <button className="btn-ghost btn-sm" onClick={onLogout}>Esci</button>
+        </div>
+      )}
+      <div className="login-brand">
+        <img className="login-logo" src="./greeneco-logo.jpeg" alt="greeneco wastewater" />
+        <h1>Operations</h1>
+        <p>Caricamento…</p>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [user, setUser] = useState(null)
   const [authRole, setAuthRole] = useState(null)
@@ -36,6 +59,11 @@ export default function App() {
   const [cassettoSub, setCassettoSub] = useState(null) // sotto-sezione iniziale del cassetto
   // Configurazione categorie/permessi (decide la visibilità delle aree).
   const [permConfig, setPermConfig] = useState(null)
+  // `true` quando la configurazione permessi è stata caricata (o il tentativo è
+  // terminato): finché è `false` l'hub non viene mostrato, così non "lampeggiano"
+  // schede/aree che l'utente non può vedere (puo() considera "config assente" =
+  // "tutto permesso", quindi senza questa attesa comparirebbero per un attimo).
+  const [permReady, setPermReady] = useState(false)
 
   useEffect(() => {
     // Deep-link da QR: ?vehicle=ID → avvia la presa in carico di quel mezzo.
@@ -58,7 +86,16 @@ export default function App() {
   // Carica la configurazione categorie/permessi (e la ricarica al login, perché
   // un amministratore può averla modificata da un altro dispositivo).
   useEffect(() => {
-    getPermissionsConfig().then(setPermConfig).catch(() => {})
+    let alive = true
+    setPermReady(false)
+    // Rete di sicurezza: se il caricamento non si conclude (es. rete assente),
+    // dopo qualche secondo si mostra comunque l'hub per non lasciarlo bloccato.
+    const safety = setTimeout(() => { if (alive) setPermReady(true) }, 6000)
+    getPermissionsConfig()
+      .then((cfg) => { if (alive) setPermConfig(cfg) })
+      .catch(() => {})
+      .finally(() => { if (alive) { clearTimeout(safety); setPermReady(true) } })
+    return () => { alive = false; clearTimeout(safety) }
   }, [user])
 
   // Chi ha un proprio "cassetto" con le multe (flag multe.view_own) può ricevere
@@ -149,7 +186,11 @@ export default function App() {
   }
 
   // --- Autenticato: hub delle aree, poi schermata in base all'area/ruolo ---
-  if (!area)
+  if (!area) {
+    // Finché i permessi non sono pronti mostriamo una schermata di atteso con la
+    // stessa intestazione dell'hub: così le schede compaiono già corrette, senza
+    // il "lampeggio" di aree non consentite.
+    if (!permReady) return <HubLoading user={user} onLogout={handleLogout} />
     return (
       <>
         <Hub
@@ -163,6 +204,7 @@ export default function App() {
         {fineModal}
       </>
     )
+  }
 
   // Quale "faccia" di un'area mostrare è deciso dai permessi della categoria:
   // chi ha il flag *.board vede il cruscotto di gestione, gli altri la vista
