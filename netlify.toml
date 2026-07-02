@@ -1,0 +1,33 @@
+# Deploy RIDONDANTE su Netlify (in aggiunta a GitHub Pages).
+#
+# Netlify compila e pubblica il sito leggendo direttamente da GitHub, con la
+# propria infrastruttura, in modo INDIPENDENTE dalle GitHub Actions/Pages: se
+# GitHub Pages ha un disservizio (come i timeout "deployment_queued"), il sito
+# su Netlify resta comunque online — e viceversa. Due indirizzi, due pipeline.
+#
+# Setup una tantum (lato Netlify, gratuito):
+#   1. Crea un account su https://netlify.com (accedi con GitHub).
+#   2. "Add new site" -> "Import an existing project" -> GitHub ->
+#      seleziona il repository gio557/greeneco-operations.
+#   3. Netlify legge questo file e configura da solo comando di build,
+#      cartella e variabili: premi "Deploy". Ottieni un URL tipo
+#      https://<nome-scelto>.netlify.app che si aggiorna a ogni push su main.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Chiavi Supabase. La "anon key" è pubblica per progettazione (viaggia nel
+  # bundle del browser; la sicurezza è data da Supabase Auth + RLS), quindi può
+  # stare qui come già avviene nel workflow di GitHub Pages. Per sovrascriverle
+  # basta impostare le stesse variabili in Netlify (Site settings -> Environment).
+  VITE_SUPABASE_URL = "https://sgszmrgmlfsengbyoljg.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnc3ptcmdtbGZzZW5nYnlvbGpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNTQ0NjUsImV4cCI6MjA5NzYzMDQ2NX0.95DqZr1UhsRPB8CYCE94kCVowSWx-6eKP6eChPFdt3Q"
+
+# SPA: qualunque percorso serve index.html (l'app gestisce il resto lato client).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
