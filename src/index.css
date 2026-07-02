@@ -1934,3 +1934,87 @@ code {
   .app-wide { max-width: 1560px; }
   .hub { max-width: 1500px; }
 }
+
+/* =====================================================================
+   Rapportini d'intervento — facsimile del modulo cartaceo GreenEco.
+   Riproduzione fedele: bordi neri, etichette 9px, campi compilabili e
+   due riquadri firma. Tutto in colori "solidi" (hex) per una resa PDF
+   corretta. Scoping su .rapportino per non toccare il resto dell'app.
+   ===================================================================== */
+.rapportino { font-family: Arial, Helvetica, sans-serif; }
+.rap-desk { background: #e9ebe6; padding: 18px 12px 28px; }
+
+.rap-toolbar {
+  width: 820px; max-width: 100%; margin: 0 auto 14px;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.rap-toolbar-title { font: 600 13px Arial; color: #555; }
+
+.rap-scroll { width: 100%; overflow-x: auto; }
+.rap-sheet {
+  width: 820px; margin: 0 auto; background: #fff; color: #111;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .16);
+}
+.rap-sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.rap-sheet td { border: 1px solid #1a1a1a; vertical-align: top; padding: 0; }
+.rap-sheet input, .rap-sheet textarea {
+  width: 100%; border: none; outline: none; background-color: transparent;
+  font-family: Arial, Helvetica, sans-serif; box-sizing: border-box; display: block;
+}
+.rap-sheet input:focus, .rap-sheet textarea:focus { background: #fbf6d9; }
+
+/* Etichette dei campi */
+.rap-lbl { font: 9px Arial; color: #555; padding: 2px 5px 0; }
+.rap-lbl-t { padding-top: 3px; }
+
+/* Intestazione */
+.rap-logocell { width: 46%; vertical-align: middle; padding: 12px 16px; text-align: center; }
+.rap-logo { width: 100%; max-width: 290px; height: auto; display: inline-block; }
+.rap-headtitle-cell { width: 30%; text-align: center; vertical-align: middle; padding: 8px; }
+.rap-headtitle { font: 800 15px Arial; color: #1a1a1a; line-height: 1.25; }
+.rap-idcell { width: 24%; }
+.rap-idbox-bt { border-top: 1px solid #1a1a1a; }
+.rap-hf { height: 44px; font: 700 18px Arial; color: #12356e; padding: 0 6px; }
+.rap-contacts { font: 11px Arial; color: #2a2a2a; line-height: 1.5; text-align: center; padding: 5px 8px; }
+
+/* Cliente */
+.rap-in { height: 28px; font: 14px Arial; color: #111; padding: 0 5px; }
+.rap-ta { resize: none; font: 14px Arial; color: #111; padding: 2px 5px; }
+
+/* Tabella orari / ore / km */
+.rap-th  { font: 9px Arial; color: #333; text-align: center; padding: 3px 4px; vertical-align: middle; }
+.rap-data { text-align: left; vertical-align: top; }
+.rap-th2 { font: 9px Arial; color: #444; text-align: center; padding: 2px; vertical-align: middle; }
+.rap-th3 { font: 8px Arial; color: #444; text-align: center; padding: 2px; vertical-align: middle; }
+.rap-th4 { font: 8px Arial; color: #666; text-align: center; padding: 1px; vertical-align: middle; }
+.rap-time { height: 30px; text-align: center; font: 12px Arial; color: #111; }
+
+/* Descrizione + colonne laterali (a righe) */
+.rap-lined {
+  resize: none; color: #111; padding: 0 6px;
+  background-image: repeating-linear-gradient(#fff, #fff 25px, #cdd7e2 25px, #cdd7e2 26px);
+  background-attachment: local;
+}
+.rap-lined-lg { font: 15px/26px Arial; }
+.rap-lined-sm { font: 13px/26px Arial; }
+.rap-lined2 {
+  resize: none; color: #111; padding: 0 6px; font: 14px/24px Arial;
+  background-image: repeating-linear-gradient(#fff, #fff 23px, #cdd7e2 23px, #cdd7e2 24px);
+  background-attachment: local;
+}
+
+/* Firme */
+.rap-sig-head { display: flex; justify-content: space-between; align-items: center; padding: 3px 5px 0; }
+.rap-sig-lbl { font: 9px Arial; color: #555; }
+.rap-clear { font: 9px Arial; color: #b23b2e; background: none; border: none; cursor: pointer; padding: 0; }
+.rap-sig { display: block; width: 100%; touch-action: none; cursor: crosshair; background: transparent; }
+
+/* Banda "CLIENTE" */
+.rap-band { padding: 3px 6px; font: 700 11px Arial; color: #1a1a1a; letter-spacing: 1px; }
+
+@media print {
+  .rapportino .no-print { display: none !important; }
+  .rapportino .rap-desk { background: #fff; padding: 0; }
+  .rapportino .rap-scroll { overflow: visible; }
+  .rapportino .rap-sheet { box-shadow: none; width: 100%; }
+}
