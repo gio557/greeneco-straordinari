@@ -1949,6 +1949,14 @@ code {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
 }
 .rap-toolbar-title { font: 600 13px Arial; color: #555; }
+.rap-toolbar-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Archivio rapportini: voce dell'elenco (apre la consultazione). */
+.rap-item {
+  flex: 1; display: flex; align-items: center; gap: 10px;
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left; width: 100%;
+}
+.rap-item-main { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 
 .rap-scroll { width: 100%; overflow-x: auto; }
 .rap-sheet {

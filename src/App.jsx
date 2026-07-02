@@ -287,7 +287,7 @@ export default function App() {
     return (
       <div className="app app-wide">
         <Header user={user} onLogout={handleLogout} onBack={backToHub} finesCount={unackFines.length} />
-        <RapportinoIntervento user={user} />
+        <RapportinoIntervento user={user} permConfig={permConfig} />
       </div>
     )
   }

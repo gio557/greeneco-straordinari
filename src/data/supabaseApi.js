@@ -897,6 +897,74 @@ export function subscribeToDocuments(onChange) {
 }
 
 // ===========================================================================
+// RAPPORTINI D'INTERVENTO (archivio)
+// ===========================================================================
+
+function rowToRapportino(r) {
+  return {
+    id: r.id,
+    authorId: r.author_id,
+    authorName: r.author_name ?? '',
+    interventionId: r.intervention_id ?? '',
+    clientName: r.client_name ?? '',
+    docDate: r.doc_date ?? '',
+    data: r.data ?? {},
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }
+}
+
+// Salva (nuovo) o aggiorna (upsert per id) un rapportino nell'archivio.
+export async function saveRapportino(rec) {
+  const row = {
+    id: rec.id || `rap-${Date.now()}`,
+    author_id: rec.authorId ?? null,
+    author_name: rec.authorName ?? null,
+    intervention_id: rec.interventionId ?? null,
+    client_name: rec.clientName ?? null,
+    doc_date: rec.docDate ?? null,
+    data: rec.data ?? {},
+    updated_at: new Date().toISOString(),
+  }
+  const { data, error } = await supabase
+    .from('rapportini')
+    .upsert(row, { onConflict: 'id' })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return rowToRapportino(data)
+}
+
+// Elenco rapportini: solo di `authorId` (archivio personale) se passato,
+// altrimenti tutti (per chi ha la visibilità estesa).
+export async function getRapportini(authorId = null) {
+  let q = supabase.from('rapportini').select('*')
+  if (authorId) q = q.eq('author_id', authorId)
+  const { data, error } = await q.order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  return data.map(rowToRapportino)
+}
+
+export async function getAllRapportini() {
+  return getRapportini(null)
+}
+
+export async function deleteRapportino(id) {
+  const { error } = await supabase.from('rapportini').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export function subscribeToRapportini(onChange) {
+  const channel = supabase
+    .channel('rapportini_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rapportini' }, onChange)
+    .subscribe()
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+// ===========================================================================
 // CATEGORIE & PERMESSI (configurazione)
 // ===========================================================================
 
@@ -929,6 +997,7 @@ const EXPORT_TABLES = [
   'vehicle_handovers',
   'vehicle_issues',
   'clients',
+  'rapportini',
 ]
 
 export async function exportAllData(adminId) {
